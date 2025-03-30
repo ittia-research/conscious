@@ -1,0 +1,15 @@
+.*
+build
+
+# Logs
+logs
+*.log
+
+# Node build outputs and dependencies
+node_modules
+.svelte-kit
+
+# Python build outputs and dependencies
+__pycache__
+*.pyc
+*.egg-info

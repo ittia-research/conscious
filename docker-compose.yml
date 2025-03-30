@@ -1,0 +1,47 @@
+services:
+  # Database
+  conscious_db:
+    build:
+      context: ./infra/Dockerfile.d
+      dockerfile: postgres
+    env_file:
+      - ./infra/env.d/postgres
+    volumes:
+      - .data/postgres:/var/lib/postgresql/data
+      # Initialization script(s), runs only on first creation
+      - ./infra/initdb.d:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    shm_size: 1gb
+    restart: unless-stopped
+
+  # FastAPI dev instance
+  dev-backend:
+    build:
+      context: ./app/backend
+      dockerfile: Dockerfile-dev
+    env_file:
+      - ./infra/env.d/ai
+      - ./infra/env.d/postgres
+      - ./infra/env.d/backend
+      - ./infra/env.d/.private
+    volumes:
+      - ./app/backend:/app
+      - .data/cache/dspy:/cache/dspy
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  dev-frontend:
+    build:
+      context: ./app/frontend
+      dockerfile: Dockerfile-dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./infra/env.d/backend
+      - ./infra/env.d/frontend
+      - ./infra/env.d/.private
+    volumes:
+      - ./app/frontend:/app
+    restart: unless-stopped

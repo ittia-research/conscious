@@ -1,0 +1,71 @@
+# Install extensions: AGE, pgvector
+# References
+#   - https://github.com/apache/age/blob/43dcfa57f19a689ef696fad7d3d9b88401f7b2eb/docker/Dockerfile
+#   - https://github.com/pgvector/pgvector/blob/2627c5ff775ae6d7aef0c430121ccf857842d2f2/Dockerfile
+
+ARG PG_MAJOR=17
+
+# Build: AGE
+FROM postgres:$PG_MAJOR AS build_age
+ARG PG_MAJOR
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends --no-install-suggests \
+       bison \
+       build-essential \
+       flex \
+       postgresql-server-dev-$PG_MAJOR \
+       ca-certificates git
+
+RUN git clone https://github.com/apache/age /age
+
+WORKDIR /age
+
+RUN git checkout 43dcfa57f19a689ef696fad7d3d9b88401f7b2eb
+
+RUN make && make install
+
+# Final stage
+FROM postgres:$PG_MAJOR
+ARG PG_MAJOR
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends --no-install-suggests \
+    locales
+
+# Build and install pgvector
+RUN apt-mark hold locales \
+    && apt-get install -y --no-install-recommends --no-install-suggests \
+       build-essential \
+       postgresql-server-dev-$PG_MAJOR \
+       ca-certificates git
+
+RUN git clone --branch v0.8.0 --depth 1 https://github.com/pgvector/pgvector /tmp/pgvector
+
+RUN cd /tmp/pgvector && \
+		make clean && \
+		make OPTFLAGS="" && \
+		make install && \
+		mkdir /usr/share/doc/pgvector && \
+		cp LICENSE README.md /usr/share/doc/pgvector && \
+		rm -r /tmp/pgvector && \
+		apt-get remove -y build-essential postgresql-server-dev-$PG_MAJOR && \
+		apt-get autoremove -y && \
+		apt-mark unhold locales && \
+		rm -rf /var/lib/apt/lists/*
+
+# Copy from AGE build
+COPY --from=build_age /usr/lib/postgresql/$PG_MAJOR/lib/age.so /usr/lib/postgresql/$PG_MAJOR/lib/
+COPY --from=build_age /usr/share/postgresql/$PG_MAJOR/extension/age--1.5.0.sql /usr/share/postgresql/$PG_MAJOR/extension/
+COPY --from=build_age /usr/share/postgresql/$PG_MAJOR/extension/age.control /usr/share/postgresql/$PG_MAJOR/extension/
+
+# Final setup
+RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen \
+    && locale-gen \
+    && update-locale LANG=en_US.UTF-8
+
+ENV LANG=en_US.UTF-8
+ENV LC_COLLATE=en_US.UTF-8
+ENV LC_CTYPE=en_US.UTF-8
+
+CMD ["postgres", "-c", "shared_preload_libraries=age,vector"]

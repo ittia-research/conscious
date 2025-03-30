@@ -1,0 +1,92 @@
+import { env } from '$env/dynamic/private';
+import type { FindApiResponse, ApiError } from '$lib/types';
+
+const API_BASE_URL = env.BACKEND_API_BASE;
+const API_KEY = env.BACKEND_API_KEY;
+
+if (!API_BASE_URL || !API_KEY) {
+	throw new Error('BACKEND_API_BASE or BACKEND_API_KEY environment variables are not set.');
+}
+
+// --- Helper for making authenticated requests ---
+interface RequestOptions extends Omit<RequestInit, 'body'> {
+	body?: object; // Allow passing objects directly
+	endpoint: string; // Relative endpoint path (e.g., '/find')
+}
+
+async function makeApiRequest<T>(options: RequestOptions): Promise<T> {
+	const { endpoint, body, method = 'GET', headers = {}, ...restOptions } = options;
+	const url = `${API_BASE_URL}${endpoint}`;
+
+	const defaultHeaders: HeadersInit = {
+		'Content-Type': 'application/json',
+		Authorization: `Bearer ${API_KEY}`,
+		...headers
+	};
+
+	try {
+		const jsonString = JSON.stringify(body);
+
+		const response = await fetch(url, {
+			method: method,
+			headers: defaultHeaders,
+			body: body ? JSON.stringify(body) : undefined,
+			...restOptions
+		});
+
+		if (!response.ok) {
+			let errorData: ApiError = { message: `API Error: ${response.status} ${response.statusText}` };
+			try {
+				// Try to parse a more specific error from the API response body
+				const parsedError = await response.json();
+				if (parsedError && typeof parsedError.message === 'string') {
+					errorData = parsedError as ApiError;
+				}
+			} catch (parseError) {
+				// Ignore if response body isn't valid JSON or doesn't match ApiError shape
+			}
+			console.error(`API Request Failed: ${method} ${url}`, errorData);
+			throw { status: response.status, ...errorData };
+		}
+
+        // Handle cases with no content expected
+        if (response.status === 204) {
+            return undefined as T;
+        }
+
+		// Assuming successful responses return JSON
+		return (await response.json()) as T;
+
+	} catch (error: any) {
+        // Re-throw structured errors from the fetch block, wrap others
+        if (error.status) {
+            throw error; // Already a structured API error
+        } else {
+            console.error(`Network or other error calling API: ${method} ${url}`, error);
+            throw { status: 500, message: 'Failed to connect to the API service.', details: error.message } as ApiError;
+        }
+	}
+}
+
+// --- Specific API endpoint functions ---
+
+/**
+ * Calls the POST /find endpoint of the backend API.
+ * @param text - The text input.
+ * @param identifier - The identifier input.
+ * @returns A promise resolving to the list of thoughts.
+ * @throws {ApiError} If the API request fails.
+ */
+export async function findThoughts(text: string, identifier: string): Promise<string[]> {
+	try {
+		const response = await makeApiRequest<FindApiResponse>({
+			endpoint: '/v1/find',
+			method: 'POST',
+			body: { text, identifier }
+		});
+		return response.thoughts || [];
+	} catch (error) {
+		console.error('Error in findThoughts:', error);
+		throw error;
+	}
+}

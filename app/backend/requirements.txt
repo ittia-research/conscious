@@ -1,0 +1,13 @@
+dspy-ai==2.6.16
+fastapi==0.115.12
+litellm==1.65.0
+pgvector==0.4.0
+psycopg[binary,pool]==3.2.6
+SQLAlchemy==2.0.40
+SQLAlchemy-Utils==0.41.2
+pydantic==2.11.1
+pydantic-settings==2.8.1
+uvicorn==0.34.0
+
+# temp
+nest-asyncio==1.6.0

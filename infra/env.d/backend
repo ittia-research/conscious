@@ -1,0 +1,9 @@
+LOG_LEVEL_GLOBAL="DEBUG"
+LOG_LEVEL_LiteLLM="INFO"
+
+# API
+BACKEND_API_KEY="change_me"
+
+# DSPy
+DSPY_CACHE=True
+DSPY_CACHEDIR="/cache/dspy"
