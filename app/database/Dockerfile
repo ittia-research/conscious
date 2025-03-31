@@ -1,9 +1,12 @@
+# Database for production
+
 # Install extensions: AGE, pgvector
 # References
 #   - https://github.com/apache/age/blob/43dcfa57f19a689ef696fad7d3d9b88401f7b2eb/docker/Dockerfile
 #   - https://github.com/pgvector/pgvector/blob/2627c5ff775ae6d7aef0c430121ccf857842d2f2/Dockerfile
 
 ARG PG_MAJOR=17
+
 
 # Build: AGE
 FROM postgres:$PG_MAJOR AS build_age
@@ -24,6 +27,7 @@ WORKDIR /age
 RUN git checkout 43dcfa57f19a689ef696fad7d3d9b88401f7b2eb
 
 RUN make && make install
+
 
 # Final stage
 FROM postgres:$PG_MAJOR
@@ -58,6 +62,9 @@ RUN cd /tmp/pgvector && \
 COPY --from=build_age /usr/lib/postgresql/$PG_MAJOR/lib/age.so /usr/lib/postgresql/$PG_MAJOR/lib/
 COPY --from=build_age /usr/share/postgresql/$PG_MAJOR/extension/age--1.5.0.sql /usr/share/postgresql/$PG_MAJOR/extension/
 COPY --from=build_age /usr/share/postgresql/$PG_MAJOR/extension/age.control /usr/share/postgresql/$PG_MAJOR/extension/
+
+# Copy database initialization scripts for this project
+COPY ./initdb.d /docker-entrypoint-initdb.d
 
 # Final setup
 RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen \

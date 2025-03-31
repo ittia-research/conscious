@@ -1,15 +1,13 @@
 services:
-  # Database
-  conscious_db:
+  # PostgreSQL Database Production
+  prod-database:
     build:
-      context: ./infra/Dockerfile.d
-      dockerfile: postgres
+      context: ./app/database
+      dockerfile: Dockerfile
     env_file:
       - ./infra/env.d/postgres
     volumes:
       - .data/postgres:/var/lib/postgresql/data
-      # Initialization script(s), runs only on first creation
-      - ./infra/initdb.d:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
     shm_size: 1gb
@@ -47,17 +45,46 @@ services:
       HOST_HEADER: x-forwarded-host
     restart: unless-stopped
 
-  # Nginx Reverse Proxy
-  nginx:
-    image: nginx:stable-alpine
+  # Nginx Reverse Proxy Production
+  prod-nginx:
+    build:
+      context: ./app/nginx
+      dockerfile: Dockerfile
     ports:
       - '80:80'
-    volumes:
-      # Mount the Nginx configuration file (read-only)
-      - ./infra/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - prod-frontend
     restart: unless-stopped
+
+  # Nginx Reverse Proxy Development
+  dev-nginx:
+    build:
+      context: ./app/nginx
+      dockerfile: Dockerfile
+    ports:
+      - '80:80'
+    volumes:
+      # Mount the Nginx configuration file read-only
+      - ./app/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - dev-frontend
+    restart: no
+    
+  # PostgreSQL Database Development
+  dev-database:
+    build:
+      context: ./app/database
+      dockerfile: Dockerfile
+    env_file:
+      - ./infra/env.d/postgres
+    volumes:
+      - .data/postgres:/var/lib/postgresql/data
+      # Initialization script(s), runs only on first creation
+      - ./infra/initdb.d:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    shm_size: 1gb
+    restart: no
 
   # FastAPI Backend Development
   dev-backend:
