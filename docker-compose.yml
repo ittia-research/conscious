@@ -10,8 +10,8 @@ services:
       - ./infra/env.d/database
     volumes:
       - .data/postgres:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # ports:
+    #   - "5432:5432"
     shm_size: 1gb
     profiles: ["prod"]
     networks:
@@ -32,8 +32,8 @@ services:
       - ./infra/env.d/.private
     volumes:
       - .data/cache/dspy:/cache/dspy
-    ports:
-      - "8000:8000"
+    # ports:
+    #   - "8000:8000"
     depends_on:
       - prod-database
     profiles: ["prod"]
