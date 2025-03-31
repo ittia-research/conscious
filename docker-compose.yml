@@ -57,6 +57,7 @@ services:
       # Reference: https://github.com/sveltejs/kit/blob/main/documentation/docs/25-build-and-deploy/40-adapter-node.md
       PROTOCOL_HEADER: x-forwarded-proto
       HOST_HEADER: x-forwarded-host
+      PORT_HEADER: x-forwarded-port
     depends_on:
       - prod-backend
     profiles: ["prod"]
@@ -165,8 +166,9 @@ services:
     ports:
       - '80:80'
     volumes:
-      # Mount the Nginx configuration file read-only
-      - ./app/nginx/nginx.template.conf:/etc/nginx/templates/nginx.template.conf:ro
+      # Mount Nginx config files read-only
+      - ./app/nginx/default.template.conf:/etc/nginx/templates/default.template.conf:ro
+      - ./app/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     environment:
       # Used by the entrypoint script !IMPORTANT
       - FRONTEND_HOST=dev-frontend

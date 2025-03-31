@@ -5,7 +5,7 @@
 set -e
 
 # Perform variable substitution
-envsubst '$${FRONTEND_HOST}' < /etc/nginx/templates/nginx.template.conf > /etc/nginx/conf.d/default.conf
+envsubst '$${FRONTEND_HOST}' < /etc/nginx/templates/default.template.conf > /etc/nginx/conf.d/default.conf
 
 # Print the generated config for debugging
 echo "--- Generated Nginx Config (/etc/nginx/conf.d/default.conf) ---"

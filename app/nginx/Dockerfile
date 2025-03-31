@@ -5,7 +5,8 @@ FROM nginx:stable-alpine
 # Install envsubst (part of gettext package)
 RUN apk update && apk add --no-cache gettext
 
-COPY nginx.template.conf /etc/nginx/templates/nginx.template.conf
+COPY default.template.conf /etc/nginx/templates/default.template.conf
+COPY nginx.conf /etc/nginx/nginx.conf
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
