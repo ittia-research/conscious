@@ -115,7 +115,7 @@ services:
       - .data/cache/dspy:/cache/dspy
     ports:
       - "8000:8000"
-    command: sh -c "
+    command: /bin/sh -c "
         cd /app
         && uvicorn main:app --host 0.0.0.0 --port 8000 --reload
       " # Add --reload for development
@@ -141,7 +141,7 @@ services:
       # Mount local code to reload automatically during development,
       # and save installation files to local
       - ./app/frontend:/app
-    command: sh -c "
+    command: /bin/sh -c "
         cd /app
         && npm install
         && npm run dev -- --host --port 3000
@@ -173,7 +173,7 @@ services:
       - dev_network
     restart: no
 
-    
+
 networks:
   dev_network:
     driver: bridge

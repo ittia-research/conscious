@@ -20,8 +20,8 @@ Local deploy:
 git clone https://github.com/ittia-research/conscious
 cd conscious
 
-# Below are for production, change `prod` to `dev` if want to start services for development
-docker compose down  # Optional: prod and dev groups share some ports and can't start at the same time
+# Below are for production, switch `prod` and `dev` if want to start services for development
+docker compose --profile dev down  # Optional: prod and dev groups share some ports and can't start at the same time
 docker compose --profile prod up -d  # Start in background
 docker compose --profile prod logs -f  # Follow service logs
 ```
