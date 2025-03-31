@@ -15,6 +15,17 @@ Basic structure built:
 ## Get Started
 Online demo: https://conscious.ittia.net
 
+Local deploy:
+```bash
+git clone https://github.com/ittia-research/conscious
+cd conscious
+
+# Below are for production, change `prod` to `dev` if want to start services for development
+docker compose down  # Optional: prod and dev groups share some ports and can't start at the same time
+docker compose --profile prod up -d  # Start in background
+docker compose --profile prod logs -f  # Follow service logs
+```
+
 ## Goals
 - Find thoughts (knowledge, ideas) that are not within memory.
 - Store new thoughts into AI memory.

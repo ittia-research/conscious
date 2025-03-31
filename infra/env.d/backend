@@ -1,3 +1,4 @@
+# logging
 LOG_LEVEL_GLOBAL="DEBUG"
 LOG_LEVEL_LiteLLM="INFO"
 

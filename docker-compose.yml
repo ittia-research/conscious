@@ -5,12 +5,16 @@ services:
       context: ./app/database
       dockerfile: Dockerfile
     env_file:
-      - ./infra/env.d/postgres
+      - ./infra/env.d/prod
+      - ./infra/env.d/database
     volumes:
       - .data/postgres:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     shm_size: 1gb
+    profiles: ["prod"]
+    networks:
+      - prod_network
     restart: unless-stopped
 
   # FastAPI Backend Production
@@ -19,14 +23,20 @@ services:
       context: ./app/backend
       dockerfile: Dockerfile
     env_file:
+      - ./infra/env.d/prod
       - ./infra/env.d/ai
-      - ./infra/env.d/postgres
       - ./infra/env.d/backend
+      - ./infra/env.d/database
       - ./infra/env.d/.private
     volumes:
       - .data/cache/dspy:/cache/dspy
     ports:
       - "8000:8000"
+    depends_on:
+      - prod-database
+    profiles: ["prod"]
+    networks:
+      - prod_network
     restart: unless-stopped
 
   # SvelteKit Frontend Production
@@ -35,6 +45,7 @@ services:
       context: ./app/frontend
       dockerfile: Dockerfile
     env_file:
+      - ./infra/env.d/prod
       - ./infra/env.d/backend
       - ./infra/env.d/frontend
       - ./infra/env.d/.private
@@ -43,6 +54,11 @@ services:
       # Reference: https://github.com/sveltejs/kit/blob/main/documentation/docs/25-build-and-deploy/40-adapter-node.md
       PROTOCOL_HEADER: x-forwarded-proto
       HOST_HEADER: x-forwarded-host
+    depends_on:
+      - prod-backend
+    profiles: ["prod"]
+    networks:
+      - prod_network
     restart: unless-stopped
 
   # Nginx Reverse Proxy Production
@@ -52,31 +68,25 @@ services:
       dockerfile: Dockerfile
     ports:
       - '80:80'
+    environment:
+      # Used by the entrypoint script !IMPORTANT
+      - FRONTEND_HOST=prod-frontend
     depends_on:
       - prod-frontend
+    profiles: ["prod"]
+    networks:
+      - prod_network
     restart: unless-stopped
 
-  # Nginx Reverse Proxy Development
-  dev-nginx:
-    build:
-      context: ./app/nginx
-      dockerfile: Dockerfile
-    ports:
-      - '80:80'
-    volumes:
-      # Mount the Nginx configuration file read-only
-      - ./app/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - dev-frontend
-    restart: no
-    
+
   # PostgreSQL Database Development
   dev-database:
     build:
       context: ./app/database
       dockerfile: Dockerfile
     env_file:
-      - ./infra/env.d/postgres
+      - ./infra/env.d/dev
+      - ./infra/env.d/database
     volumes:
       - .data/postgres:/var/lib/postgresql/data
       # Initialization script(s), runs only on first creation
@@ -84,6 +94,9 @@ services:
     ports:
       - "5432:5432"
     shm_size: 1gb
+    profiles: ["dev"]
+    networks:
+      - dev_network
     restart: no
 
   # FastAPI Backend Development
@@ -92,9 +105,10 @@ services:
       context: ./app/backend
       dockerfile: Dockerfile
     env_file:
+      - ./infra/env.d/dev
       - ./infra/env.d/ai
-      - ./infra/env.d/postgres
       - ./infra/env.d/backend
+      - ./infra/env.d/database
       - ./infra/env.d/.private
     volumes:
       - ./app/backend:/app
@@ -105,6 +119,11 @@ services:
         cd /app
         && uvicorn main:app --host 0.0.0.0 --port 8000 --reload
       " # Add --reload for development
+    depends_on:
+      - dev-database
+    profiles: ["dev"]
+    networks:
+      - dev_network
     restart: no
 
   # SvelteKit Frontend Development
@@ -114,6 +133,7 @@ services:
     ports:
       - "3000:3000"
     env_file:
+      - ./infra/env.d/dev
       - ./infra/env.d/backend
       - ./infra/env.d/frontend
       - ./infra/env.d/.private
@@ -126,4 +146,36 @@ services:
         && npm install
         && npm run dev -- --host --port 3000
       "
+    depends_on:
+      - dev-backend
+    profiles: ["dev"]
+    networks:
+      - dev_network
     restart: no
+
+  # Nginx Reverse Proxy Development
+  dev-nginx:
+    build:
+      context: ./app/nginx
+      dockerfile: Dockerfile
+    ports:
+      - '80:80'
+    volumes:
+      # Mount the Nginx configuration file read-only
+      - ./app/nginx/nginx.template.conf:/etc/nginx/templates/nginx.template.conf:ro
+    environment:
+      # Used by the entrypoint script !IMPORTANT
+      - FRONTEND_HOST=dev-frontend
+    depends_on:
+      - dev-frontend
+    profiles: ["dev"]
+    networks:
+      - dev_network
+    restart: no
+
+    
+networks:
+  dev_network:
+    driver: bridge
+  prod_network:
+    driver: bridge

@@ -1,0 +1,2 @@
+POSTGRES_HOST="dev-database"
+BACKEND_API_BASE="http://dev-backend:8000"

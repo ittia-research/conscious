@@ -1,6 +1,5 @@
 POSTGRES_USER="db_user"
 POSTGRES_PASSWORD="change_me"
 POSTGRES_DB="conscious_db"
-POSTGRES_HOST="conscious_db"
 POSTGRES_PORT=5432
 GRAPH_NAME="conscious_graph"

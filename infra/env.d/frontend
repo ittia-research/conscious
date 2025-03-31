@@ -1,5 +1,2 @@
-# Backend API
-BACKEND_API_BASE="http://localhost:8000"
-
 # If lock frontend for demonstration only ans save resources
 FRONTEND_LOCK=false

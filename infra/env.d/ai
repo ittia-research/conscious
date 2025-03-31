@@ -2,10 +2,9 @@ VECTOR_DIMENSION=1024
 
 # Embedding
 EMBEDDING_MODEL="openai/jinaai/jina-embeddings-v3"
-EMBEDDING_API_BASE="http://localhost:7997/"
+EMBEDDING_API_BASE="http://infinity:7997/"
 EMBEDDING_API_KEY="change_me"
 
 # LLM
 LLM_MODEL="gemini/gemini-2.0-flash-thinking-exp-01-21"
-# LLM_MODEL="gemini/gemini-1.5-pro"
 LLM_API_KEY="change_me"
