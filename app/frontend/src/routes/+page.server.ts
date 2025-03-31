@@ -1,167 +1,74 @@
-// Get API endpoints info from FastAPI docs
+import { env } from '$env/dynamic/private'; // To read server-side environment variables
+import { fail } from '@sveltejs/kit';
+import type { Actions, PageServerLoad } from './api/$types'; // Add PageServerLoad
+import { findThoughts } from '$lib/server/api.client';
+import type { ApiError } from '$lib/types';
 
-import type { Load } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
+// --- Define Default Values ---
+const DEFAULT_TEXT = `More than ever before, the Renaissance stands as one of the defining moments in world history. Between 1400 and 1600, European perceptions of society, culture, politics and even humanity itself emerged in ways that continue to affect not only Europe but the entire world.
 
-// Define the structure we want for our processed endpoints
-export interface EndpointInfo {
-  path: string;
-  method: string; // Will be uppercase (GET, POST, etc.)
-  summary?: string; // Use summary or description from OpenAPI
-  description?: string;
-  tags?: string[];
-  parameters?: { name: string; in: string; description?: string; required?: boolean }[];
-  // Add more fields if needed, e.g., requestBody, responses
-}
+This wide-ranging exploration of the Renaissance sees the period as a time of unprecedented intellectual excitement and cultural experimentation and interaction on a global scale, alongside a darker side of religion, intolerance, slavery, and massive inequality of wealth and status. It guides the reader through the key issues that defined the period, from its art, architecture, and literature, to advancements in the fields of science, trade, and travel. In its incisive account of the complexities of the political and religious upheavals of the period, the book argues that Europe's reciprocal relationship with its eastern neighbours offers us a timely perspective on the Renaissance that still has much to teach us today.`;
+const DEFAULT_IDENTIFIER = "text_demo_1";
 
-// Basic types for relevant parts of OpenAPI spec (you might want more detailed types)
-interface OpenApiParameter {
-    name: string;
-    in: 'path' | 'query' | 'header' | 'cookie';
-    description?: string;
-    required?: boolean;
-    schema?: object; // Can be more detailed
-}
+// --- Load Function ---
+// This runs on the server before the page component is rendered
+export const load: PageServerLoad = async () => {
+    // Read the environment variable. Check specifically for the string 'true'.
+    const isLocked = env.FRONTEND_LOCK === 'true';
 
-interface OpenApiOperation {
-    tags?: string[];
-    summary?: string;
-    description?: string;
-    operationId?: string;
-    parameters?: OpenApiParameter[];
-    requestBody?: object; // Can be more detailed
-    responses?: object; // Can be more detailed
-}
-
-// Type for methods within a path (get, post, etc.)
-type HttpMethod = 'get' | 'post' | 'put' | 'delete' | 'patch' | 'options' | 'head' | 'trace';
-
-// Type for a path item, containing operations for different methods
-type PathItem = {
-    [method in HttpMethod]?: OpenApiOperation;
-} & {
-    parameters?: OpenApiParameter[]; // Parameters common to all methods in this path
+    // Return the lock status and the default values.
+    // This object will be available as the `data` prop in +page.svelte
+    return {
+        isLocked: isLocked,
+        defaultText: DEFAULT_TEXT,
+        defaultIdentifier: DEFAULT_IDENTIFIER
+    };
 };
 
-// Basic type for the overall OpenAPI document structure
-interface OpenApiSpec {
-  openapi: string;
-  info: {
-    title: string;
-    version: string;
-    // ... other info fields
-  };
-  paths: {
-    [path: string]: PathItem;
-  };
-  components?: object; // Schemas, security schemes etc.
-  // ... other top-level fields
-}
+// --- Actions Object ---
+// This handles form submissions
+export const actions: Actions = {
+	findThoughts: async ({ request }) => {
+		const formData = await request.formData();
+		const text = formData.get('text') as string;
+		const identifier = formData.get('identifier') as string;
 
+        // Use the values submitted, which might be the defaults if locked
+		const effectiveText = text;
+        const effectiveIdentifier = identifier;
 
-export const load: Load = async ({ fetch }) => {
-    const backendApiBase = env.BACKEND_API_BASE;
-
-    if (!backendApiBase) {
-        console.error("BACKEND_API_BASE environment variable is not set.");
-        // You could throw an error here, or return an empty list/error state
-        // throw error(500, "Backend API base URL is not configured");
-        return {
-            endpoints: [],
-            error: "Backend API base URL is not configured on the server.",
-            apiTitle: "API Docs", // Default title
-            apiVersion: "",
-        };
-    }
-
-    const openApiUrl = `${backendApiBase}/openapi.json`; // Default FastAPI OpenAPI URL
-
-    try {
-        console.log(`Fetching OpenAPI spec from: ${openApiUrl}`);
-        const response = await fetch(openApiUrl);
-
-        if (!response.ok) {
-            console.error(`Failed to fetch OpenAPI spec: ${response.status} ${response.statusText}`);
-            const errorText = await response.text();
-            console.error("Response body:", errorText);
-            return {
-                endpoints: [],
-                error: `Failed to fetch API documentation (${response.status}) from ${openApiUrl}. Is the backend running and accessible?`,
-                apiTitle: "API Docs Error",
-                apiVersion: "",
-            };
-            // Or throw: throw error(response.status, `Failed to fetch API documentation: ${response.statusText}`);
-        }
-
-        const openapiDoc = await response.json() as OpenApiSpec;
-
-        // --- Process the OpenAPI document ---
-        const processedEndpoints: EndpointInfo[] = [];
-        const apiTitle = openapiDoc.info?.title ?? "API Documentation";
-        const apiVersion = openapiDoc.info?.version ?? "";
-
-
-        for (const path in openapiDoc.paths) {
-            const pathItem = openapiDoc.paths[path];
-            const commonParameters = pathItem.parameters || []; // Parameters defined at the path level
-
-            // Iterate over possible HTTP methods
-            (Object.keys(pathItem) as HttpMethod[]).forEach((method) => {
-                 // Filter out non-method keys like 'parameters', 'summary', etc.
-                 if (!['get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'trace'].includes(method)) {
-                    return;
-                 }
-
-                const operation = pathItem[method];
-                if (operation) {
-                    // Combine path-level parameters with operation-specific parameters
-                     const operationParameters = operation.parameters || [];
-                     const allParameters = [...commonParameters, ...operationParameters];
-                     // Basic parameter processing (can be enhanced)
-                     const processedParams = allParameters.map(p => ({
-                         name: p.name,
-                         in: p.in,
-                         description: p.description,
-                         required: p.required
-                     }));
-
-                    processedEndpoints.push({
-                        path: path,
-                        method: method.toUpperCase(), // Standardize to uppercase
-                        summary: operation.summary,
-                        description: operation.description,
-                        tags: operation.tags,
-                        parameters: processedParams.length > 0 ? processedParams : undefined,
-                    });
-                }
+		if (!effectiveText || !effectiveIdentifier) {
+			// Return submitted values along with the error
+			return fail(400, {
+                error: 'Text and Identifier are required.',
+                text: effectiveText, // Return potentially null/empty values
+                identifier: effectiveIdentifier
             });
-        }
+		}
 
-        // Optional: Sort endpoints (e.g., by path, then method)
-        processedEndpoints.sort((a, b) => {
-            if (a.path < b.path) return -1;
-            if (a.path > b.path) return 1;
-            // If paths are equal, sort by method (e.g., GET before POST)
-            const methodOrder = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD', 'TRACE'];
-            return methodOrder.indexOf(a.method) - methodOrder.indexOf(b.method);
-        });
+		try {
+			// Call the API client function with the effective values
+			const thoughts = await findThoughts(effectiveText, effectiveIdentifier);
 
-        return {
-            endpoints: processedEndpoints,
-            apiTitle: apiTitle,
-            apiVersion: apiVersion,
-            error: null, // No error
-        };
+			// Return success data, including the inputs used, for the form
+			return {
+                success: true,
+                thoughts: thoughts,
+                text: effectiveText,         // Return the text used
+                identifier: effectiveIdentifier // Return the identifier used
+            };
 
-    } catch (e: any) {
-        console.error("Error fetching or processing OpenAPI spec:", e);
-        // Return an error state that the page can display
-        return {
-            endpoints: [],
-            error: `An error occurred while fetching or processing API documentation: ${e.message}`,
-            apiTitle: "API Docs Error",
-            apiVersion: "",
-        };
-        // Or throw: throw error(500, `Failed to process API documentation: ${e.message}`);
-    }
+		} catch (error: unknown) {
+			const apiError = error as ApiError & { status?: number }; // Type assertion remains useful
+			console.error('Failed action in /find page:', apiError);
+
+            // Use the status and message from the structured error
+            // Return submitted values along with the error
+			return fail(apiError.status || 500, {
+                error: apiError.message || 'An unexpected error occurred.',
+                text: effectiveText, // Return the text that caused the error
+                identifier: effectiveIdentifier // Return the identifier that caused the error
+            });
+		}
+	}
 };

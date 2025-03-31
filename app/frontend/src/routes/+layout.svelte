@@ -17,9 +17,9 @@
 		<ul class="flex space-x-6 items-center">
 		  <li>
 			<a
-			  href="/find"
+			  href="/api"
 			  class="hover:text-blue-200 transition duration-200 px-3 py-2 rounded-md text-sm font-medium"
-			  aria-current="page">Find</a
+			  aria-current="page">API</a
 			>
 		  </li>
 		  <li>

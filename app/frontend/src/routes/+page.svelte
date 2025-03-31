@@ -1,108 +1,177 @@
 <script lang="ts">
-    import type { PageData } from './$types'; // Import the type for the data prop
-  
-    // The 'data' prop is automatically populated by SvelteKit
-    // with the return value from +page.server.ts's load function
-    export let data: PageData;
-  
-    // Reactive assignments for easier template access
-    $: endpoints = data.endpoints ?? [];
-    $: error = data.error;
-    $: apiTitle = data.apiTitle ?? 'API Documentation';
-    $: apiVersion = data.apiVersion ? `(v${data.apiVersion})` : '';
-  
-    // Helper function to get badge color based on method
-    function getMethodClass(method: string): string {
-      switch (method.toUpperCase()) {
-          case 'GET':     return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-          case 'POST':    return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-          case 'PUT':     return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-          case 'PATCH':   return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300'; // e.g., using orange for PATCH
-          case 'DELETE':  return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-          default:        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-      }
+  import type { ActionData, PageData } from './$types'; // Import PageData
+  import { enhance } from '$app/forms'; // For progressive enhancement
+  import { onMount } from 'svelte'; 
+
+  // ActionData contains data returned from the form action (+page.server.ts)
+  export let form: ActionData;
+  // PageData contains data returned from the load function (+page.server.ts)
+  export let data: PageData;
+
+  // Get lock status and defaults from the load function's data
+  const isLocked = data.isLocked;
+  const defaultText = data.defaultText;
+  const defaultIdentifier = data.defaultIdentifier;
+
+  let isLoading = false;
+
+  // Initialize form field values:
+  // Use values returned from the action if available (after submission),
+  // otherwise use the defaults passed from the load function. --> Initial setup
+  let textValue = form?.text ? String(form.text) : defaultText; // Keep this for post-action state
+  let identifierValue = form?.identifier ? String(form.identifier) : defaultIdentifier;
+
+  // <-- Add onMount block
+  onMount(() => {
+    // Force reset values based on load data when component mounts,
+    // overriding browser autofill/bfcache restoration.
+    textValue = defaultText;
+    identifierValue = defaultIdentifier;
+  });
+ 
+  // Reactive statements to easily access form results or errors
+  $: thoughts = form?.success ? (form.thoughts as string[]) : [];
+  $: errorMessage = form?.error ? String(form.error) : null;
+
+  // Ensure form values reset/update correctly after action returns
+  // This might override user input briefly if they navigate back/forward,
+  // but primarily handles the state after form submission.
+  $: if (form?.text !== undefined) textValue = String(form.text);
+  $: if (form?.identifier !== undefined) identifierValue = String(form.identifier);
+  // If form becomes null/undefined (e.g., navigating away and back), reset to defaults
+  $: if (form === null || form === undefined) {
+      textValue = defaultText;
+      identifierValue = defaultIdentifier;
+      errorMessage = null; // Clear errors on reset
+      // thoughts = []; // Optionally clear results too
+  }
+
+
+  // Function to handle form submission start/end for loading state
+  function handleSubmitStart() {
+    isLoading = true;
+    errorMessage = null; // Clear previous errors
+  }
+  function handleSubmitEnd() {
+    isLoading = false;
+  }
+
+  // When locked, force values back to default just before submission enhancement runs
+  function handleBeforeSubmit() {
+    if (isLocked) {
+      textValue = defaultText;
+      identifierValue = defaultIdentifier;
     }
-  </script>
-  
-  <div class="space-y-8">
-    <section class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-      <h1 class="text-3xl font-bold text-blue-700 dark:text-blue-400 mb-2">
-        {apiTitle} <span class="text-xl font-normal text-gray-500 dark:text-gray-400">{apiVersion}</span>
-      </h1>
-      <p class="text-lg text-gray-700 dark:text-gray-300">
-        Welcome! Below are the available API endpoints discovered from the backend.
-      </p>
-    </section>
-  
-    <section>
-      <h2 class="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Available Endpoints</h2>
-  
-      {#if error}
-        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
-          <strong class="font-bold">Loading Error:</strong>
-          <span class="block sm:inline"> {error}</span>
-        </div>
+    handleSubmitStart(); // Start loading indicator
+  }
+
+</script>
+
+<div class="container mx-auto p-8">
+  <h1 class="text-3xl font-bold mb-6">Find Thoughts</h1>
+
+  {#if isLocked}
+    <div class="mb-4 p-3 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded-md" role="status">
+      Input is locked. Using default values.
+    </div>
+  {/if}
+
+  <!-- Use SvelteKit's 'enhance' for progressive enhancement -->
+  <form
+    method="POST"
+    action="?/findThoughts"
+    autocomplete="off"
+    use:enhance={() => {
+      // Run checks/state updates *before* the submission starts
+      handleBeforeSubmit();
+
+      return async ({ update }) => {
+        // This runs *after* the form submission completes on the server
+        await update({ reset: false }); // Update form data, don't reset native form elements
+                                        // as Svelte manages state via bind:value
+        handleSubmitEnd(); // End loading indicator
+      };
+    }}
+    class="space-y-4 mb-8 p-6 border rounded-lg shadow-md bg-white"
+  >
+    <div>
+      <label for="text" class="block text-sm font-medium text-gray-700 mb-1">Text:</label>
+      <textarea
+        id="text"
+        name="text"
+        rows="7"
+        class:input-locked={isLocked} 
+        class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+        class:bg-gray-100={isLocked} 
+        placeholder={isLocked ? "Using default value" : "Enter text..."}
+        bind:value={textValue}
+        required
+        readonly={isLocked} 
+        disabled={isLoading} 
+        aria-readonly={isLocked}
+      ></textarea>
+    </div>
+
+    <div>
+      <label for="identifier" class="block text-sm font-medium text-gray-700 mb-1">Identifier:</label>
+      <input
+        type="text"
+        id="identifier"
+        name="identifier"
+        class:input-locked={isLocked} 
+        class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+        class:bg-gray-100={isLocked} 
+        placeholder={isLocked ? "Using default value" : "Enter identifier..."}
+        bind:value={identifierValue}
+        required
+        readonly={isLocked} 
+        disabled={isLoading} 
+        aria-readonly={isLocked}
+      />
+    </div>
+
+    <button
+      type="submit"
+      class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+      disabled={isLoading} 
+    >
+      {#if isLoading}
+        <span>Loading...</span>
+      {:else}
+        <span>Find Thoughts</span>
       {/if}
-  
-      {#if !error && endpoints.length > 0}
-        <ul class="space-y-4">
-          {#each endpoints as endpoint (endpoint.path + endpoint.method)}
-            <li class="bg-white dark:bg-gray-800 p-5 rounded-lg shadow hover:shadow-lg transition duration-200 border border-gray-200 dark:border-gray-700">
-              <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-                <code class="text-lg font-mono bg-gray-100 dark:bg-gray-700 text-purple-700 dark:text-purple-300 px-3 py-1 rounded break-all">
-                  {endpoint.path}
-                </code>
-                <span
-                  class="text-sm font-semibold px-2.5 py-0.5 rounded {getMethodClass(endpoint.method)}"
-                >
-                  {endpoint.method}
-                </span>
-              </div>
-  
-              {#if endpoint.summary}
-                <p class="text-gray-800 dark:text-gray-200 font-medium mb-1">{endpoint.summary}</p>
-              {/if}
-              {#if endpoint.description && endpoint.description !== endpoint.summary}
-                 <p class="text-gray-600 dark:text-gray-400 mb-3 text-sm">{endpoint.description}</p>
-              {/if}
-               {#if !endpoint.summary && !endpoint.description}
-                 <p class="text-gray-500 dark:text-gray-500 italic mb-3 text-sm">No description provided.</p>
-              {/if}
-  
-              {#if endpoint.tags && endpoint.tags.length > 0}
-                <div class="mb-3">
-                    <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 mr-2">Tags:</span>
-                    {#each endpoint.tags as tag}
-                        <span class="inline-block bg-gray-200 dark:bg-gray-600 rounded-full px-2 py-0.5 text-xs font-semibold text-gray-700 dark:text-gray-200 mr-1 mb-1">{tag}</span>
-                    {/each}
-                </div>
-              {/if}
-  
-              {#if endpoint.parameters && endpoint.parameters.length > 0}
-                <div>
-                  <h4 class="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">Parameters:</h4>
-                  <ul class="list-none space-y-1 pl-2">
-                    {#each endpoint.parameters as param}
-                      <li class="text-sm flex items-center gap-2">
-                         <span class="text-xs font-semibold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300 w-12 text-center">{param.in}</span>
-                         <code class="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1.5 py-0.5 rounded font-mono">{param.name}</code>
-                        {#if param.required}
-                             <span class="text-xs text-red-600 dark:text-red-400 font-semibold">(required)</span>
-                        {/if}
-                        {#if param.description}
-                           <span class="text-gray-500 dark:text-gray-400 text-xs italic">- {param.description}</span>
-                        {/if}
-                      </li>
-                    {/each}
-                  </ul>
-                </div>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-      {:else if !error}
-         <p class="text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 p-4 rounded-lg shadow text-center">No endpoints found or the API documentation is empty.</p>
-      {/if}
-  
-    </section>
-  </div>
+    </button>
+  </form>
+
+  <!-- Display Error Messages -->
+  {#if errorMessage && !isLoading}
+    <div class="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md" role="alert">
+      <p class="font-bold">Error</p>
+      <p>{errorMessage}</p>
+    </div>
+  {/if}
+
+  <!-- Display Results -->
+  {#if form?.success && thoughts.length > 0 && !isLoading}
+    <div class="mt-8">
+      <h2 class="text-2xl font-semibold mb-4">Results:</h2>
+       <p class="text-sm text-gray-600 mb-2">Showing results for identifier: <code class="bg-gray-200 px-1 rounded">{form?.identifier}</code> and text starting with: <code class="bg-gray-200 px-1 rounded">{form?.text?.substring(0, 50)}...</code></p>
+      <ul class="space-y-2 list-disc list-inside bg-gray-50 p-4 rounded-md border">
+        {#each thoughts as thought, i (i)}
+          <li class="text-gray-800">{thought}</li>
+        {/each}
+      </ul>
+    </div>
+  {:else if form?.success && thoughts.length === 0 && !isLoading}
+     <p class="mt-8 text-gray-600">No thoughts found for identifier: <code class="bg-gray-200 px-1 rounded">{form?.identifier}</code> and text starting with: <code class="bg-gray-200 px-1 rounded">{form?.text?.substring(0, 50)}...</code></p>
+  {/if}
+
+</div>
+
+<!-- <style>
+  /* Optional: Style for locked inputs */
+  .input-locked {
+     /* Add styles like cursor: not-allowed, different background, etc. if needed */
+     /* The readonly attribute and class:bg-gray-100 already provide visual cues */
+  }
+</style> -->
