@@ -6,7 +6,7 @@ const config = {
 	kit: { 
 		adapter: adapter(),
 		csrf: {
-			checkOrigin: true,
+			checkOrigin: true, // Default true. Foe debug only.
 		},
 	},
 	
