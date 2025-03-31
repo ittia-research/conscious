@@ -13,7 +13,7 @@ Sync:
   - [ ] Map for explore
 
 ## Data
-- [ ] Source identifier: UUID%, dsn?
+- [ ] Source identifier: UUID5, dsn?
 - [ ] Use identifier (GUID) for table ID?
 - [ ] What identifier to use for sub-sources?
 

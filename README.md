@@ -1,4 +1,5 @@
 Next step to be super human.
+
 Explore interfaces between AI and human.
 
 ## Latest Status
@@ -15,7 +16,7 @@ Basic structure built:
 Online demo: https://conscious.ittia.net
 
 ## Goals
-- Find thoughts(knowledge, ideas) that are not within memory.
+- Find thoughts (knowledge, ideas) that are not within memory.
 - Store new thoughts into AI memory.
 - Sync between AI and human memory.
 - Memory could belong to a individual, a group, or a organization.
