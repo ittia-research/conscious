@@ -15,7 +15,7 @@ services:
     shm_size: 1gb
     restart: unless-stopped
 
-  # FastAPI dev instance
+  # FastAPI Development
   dev-backend:
     build:
       context: ./app/backend
@@ -30,12 +30,13 @@ services:
       - .data/cache/dspy:/cache/dspy
     ports:
       - "8000:8000"
-    restart: unless-stopped
+    restart: no
 
+  # SvelteKit Development
   dev-frontend:
     build:
       context: ./app/frontend
-      dockerfile: Dockerfile-dev
+      dockerfile: Dockerfile.dev
     ports:
       - "3000:3000"
     env_file:
@@ -44,4 +45,17 @@ services:
       - ./infra/env.d/.private
     volumes:
       - ./app/frontend:/app
+    restart: no
+
+  # SvelteKit Production
+  prod-frontend:
+    build:
+      context: ./app/frontend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./infra/env.d/backend
+      - ./infra/env.d/frontend
+      - ./infra/env.d/.private
     restart: unless-stopped

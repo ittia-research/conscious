@@ -1,13 +1,6 @@
 import { env } from '$env/dynamic/private';
 import type { FindApiResponse, ApiError } from '$lib/types';
 
-const API_BASE_URL = env.BACKEND_API_BASE;
-const API_KEY = env.BACKEND_API_KEY;
-
-if (!API_BASE_URL || !API_KEY) {
-	throw new Error('BACKEND_API_BASE or BACKEND_API_KEY environment variables are not set.');
-}
-
 // --- Helper for making authenticated requests ---
 interface RequestOptions extends Omit<RequestInit, 'body'> {
 	body?: object; // Allow passing objects directly
@@ -15,8 +8,17 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
 }
 
 async function makeApiRequest<T>(options: RequestOptions): Promise<T> {
+    const API_BASE = env.BACKEND_API_BASE;
+    const API_KEY = env.BACKEND_API_KEY;
+
+    if (!API_BASE || !API_KEY) {
+        // Log the error server-side for debugging
+        console.error('FATAL: Backend API Base URL or API Key is not configured in the server environment.');
+        throw new Error('Server configuration error: Missing backend API credentials.');
+    }
+
 	const { endpoint, body, method = 'GET', headers = {}, ...restOptions } = options;
-	const url = `${API_BASE_URL}${endpoint}`;
+	const url = `${API_BASE}${endpoint}`;
 
 	const defaultHeaders: HeadersInit = {
 		'Content-Type': 'application/json',

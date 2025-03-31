@@ -1,4 +1,5 @@
-FROM node:23-alpine
+# Using Debian for production
+FROM node:23-bookworm
 
 WORKDIR /app
 

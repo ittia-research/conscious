@@ -168,10 +168,10 @@
 
 </div>
 
-<style>
+<!-- <style>
   /* Optional: Style for locked inputs */
   .input-locked {
      /* Add styles like cursor: not-allowed, different background, etc. if needed */
      /* The readonly attribute and class:bg-gray-100 already provide visual cues */
   }
-</style>
+</style> -->
