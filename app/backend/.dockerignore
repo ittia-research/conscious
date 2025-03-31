@@ -1,0 +1,51 @@
+# git
+.git
+.gitignore
+.gitattributes
+
+# Python Virtual Environments
+.venv
+venv
+
+# Python Cache & Compiled Files
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# IDE & Editor Configuration
+.idea
+.vscode
+*.sublime-project
+*.sublime-workspace
+nbproject
+*.swp
+*.swo
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# Build & Distribution Artifacts
+build
+dist
+*.egg-info
+*.egg
+wheels
+*.whl
+
+# Test Artifacts & Reports
+.pytest_cache
+.coverage
+htmlcov
+nosetests.xml
+coverage.xml
+test-reports
+
+# Logs
+*.log
+
+# Secrets & Environment Configuration
+*.env
+.env*
+secrets
