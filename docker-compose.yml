@@ -32,21 +32,6 @@ services:
       - "8000:8000"
     restart: no
 
-  # SvelteKit Development
-  dev-frontend:
-    build:
-      context: ./app/frontend
-      dockerfile: Dockerfile.dev
-    ports:
-      - "3000:3000"
-    env_file:
-      - ./infra/env.d/backend
-      - ./infra/env.d/frontend
-      - ./infra/env.d/.private
-    volumes:
-      - ./app/frontend:/app
-    restart: no
-
   # SvelteKit Production
   prod-frontend:
     build:
@@ -74,3 +59,24 @@ services:
     depends_on:
       - prod-frontend
     restart: unless-stopped
+
+  # SvelteKit Frontend Development
+  dev-frontend:
+    # Use Debian for development
+    image: node:23-bookworm-slim
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./infra/env.d/backend
+      - ./infra/env.d/frontend
+      - ./infra/env.d/.private
+    volumes:
+      # Mount local code to reload automatically during development,
+      # and save installation files to local
+      - ./app/frontend:/app
+    command: sh -c "
+        cd /app
+        && npm install
+        && npm run dev -- --host --port 3000
+      "
+    restart: no
