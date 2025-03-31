@@ -69,3 +69,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
+          # Do not generate the build provenance attestation manifest, which might cause unknown/unknown OS entry.
+          # TO-DO: shall we enable this for better security?
+          provenance: false
