@@ -1,9 +1,10 @@
 services:
   # PostgreSQL Database Production
   prod-database:
-    build:
-      context: ./app/database
-      dockerfile: Dockerfile
+    image: ghcr.io/ittia-research/conscious:latest-database
+    # build:
+    #   context: ./app/database
+    #   dockerfile: Dockerfile
     env_file:
       - ./infra/env.d/prod
       - ./infra/env.d/database
@@ -19,9 +20,10 @@ services:
 
   # FastAPI Backend Production
   prod-backend:
-    build:
-      context: ./app/backend
-      dockerfile: Dockerfile
+    image: ghcr.io/ittia-research/conscious:latest-backend
+    # build:
+    #   context: ./app/backend
+    #   dockerfile: Dockerfile
     env_file:
       - ./infra/env.d/prod
       - ./infra/env.d/ai
@@ -41,9 +43,10 @@ services:
 
   # SvelteKit Frontend Production
   prod-frontend:
-    build:
-      context: ./app/frontend
-      dockerfile: Dockerfile
+    image: ghcr.io/ittia-research/conscious:latest-frontend
+    # build:
+    #   context: ./app/frontend
+    #   dockerfile: Dockerfile
     env_file:
       - ./infra/env.d/prod
       - ./infra/env.d/backend
@@ -63,9 +66,10 @@ services:
 
   # Nginx Reverse Proxy Production
   prod-nginx:
-    build:
-      context: ./app/nginx
-      dockerfile: Dockerfile
+    image: ghcr.io/ittia-research/conscious:latest-nginx
+    # build:
+    #   context: ./app/nginx
+    #   dockerfile: Dockerfile
     ports:
       - '80:80'
     environment:
