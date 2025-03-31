@@ -1,4 +1,9 @@
 services:
+
+  # =====================================================================
+  # ==                       Start Profile Prod                        ==
+  # =====================================================================
+
   # PostgreSQL Database Production
   prod-database:
     image: ghcr.io/ittia-research/conscious:latest-database
@@ -9,7 +14,7 @@ services:
       - ./infra/env.d/prod
       - ./infra/env.d/database
     volumes:
-      - .data/postgres:/var/lib/postgresql/data
+      - /data/volumes/conscious/postgres:/var/lib/postgresql/data
     # ports:
     #   - "5432:5432"
     shm_size: 1gb
@@ -31,7 +36,7 @@ services:
       - ./infra/env.d/database
       - ./infra/env.d/.private
     volumes:
-      - .data/cache/dspy:/cache/dspy
+      - /data/cache/conscious/dspy:/cache/dspy
     # ports:
     #   - "8000:8000"
     depends_on:
@@ -82,6 +87,11 @@ services:
     networks:
       - prod_network
     restart: unless-stopped
+
+
+  # =====================================================================
+  # ==                        Start Profile Dev                        ==
+  # =====================================================================
 
 
   # PostgreSQL Database Development
@@ -178,6 +188,36 @@ services:
     networks:
       - dev_network
     restart: no
+
+
+  # =====================================================================
+  # ==                       Start Profile Utils                       ==
+  # =====================================================================
+
+
+  # Infinity inference server for embedding, rerank, etc.
+  infinity:
+    image: michaelf34/infinity:latest
+    ports:
+      - 7997:7997
+    volumes:
+      - /data/cache/huggingface:/cache/huggingface
+    env_file:
+      - ./infra/env.d/infinity
+      - ./infra/env.d/huggingface
+    command: ["v2"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    profiles: ["utils"]
+    networks:  # Available to both dev and prod
+      - dev_network
+      - prod_network
+    restart: unless-stopped
 
 
 networks:
