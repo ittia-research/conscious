@@ -13,7 +13,9 @@ Basic structure built:
 - Basic web page to interact with backend API (SvelteKit)
 
 ## Get Started
-Online demo: https://conscious.ittia.net
+[Online demo](https://conscious.ittia.net)
+
+[Full user manual](./docs/manual.md)
 
 Local deploy:
 ```bash
@@ -45,7 +47,7 @@ And in doing so, hopefully unlock some secrets about conscious.
 - No word salad.
 
 ## Links
-[To-do](./docs/todo.md)
+[TO-DO](./docs/todo.md)
 
 ## Acknowledgements
 - TPU Research Cloud team at Google
