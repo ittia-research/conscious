@@ -47,7 +47,8 @@ And in doing so, hopefully unlock some secrets about conscious.
 - No word salad.
 
 ## Links
-[TO-DO](./docs/todo.md)
+[Structure](./docs/structure)
+[Roadmap](./docs/roadmap.md)
 
 ## Acknowledgements
 - TPU Research Cloud team at Google
