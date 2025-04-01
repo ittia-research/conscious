@@ -1,7 +1,7 @@
-VECTOR_DIMENSION=1024
+VECTOR_DIMENSION=1536
 
 # Embedding
-EMBEDDING_MODEL="openai/jinaai/jina-embeddings-v3"
+EMBEDDING_MODEL="openai/Alibaba-NLP/gte-Qwen2-1.5B-instruct"
 EMBEDDING_API_BASE="http://infinity:7997/"
 EMBEDDING_API_KEY=<CHANGE_ME>
 

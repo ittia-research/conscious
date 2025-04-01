@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS thoughts (
     thought_id BIGSERIAL PRIMARY KEY,       -- Use BIGSERIAL for potentially large tables
     content TEXT NOT NULL,                  -- The text content
-    embedding VECTOR(1024) NOT NULL,        -- The vector embedding. Replace the dimension number.
+    embedding VECTOR(1536) NOT NULL,        -- The vector embedding. Replace the dimension number.
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP -- Timestamp when the record was created
 );
 

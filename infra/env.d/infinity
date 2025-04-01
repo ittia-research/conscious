@@ -1,7 +1,7 @@
 INFINITY_API_KEY=<CHANGE_ME>
 INFINITY_LOG_LEVEL=debug
-INFINITY_MODEL_ID="jinaai/jina-embeddings-v3;jinaai/jina-reranker-v2-base-multilingual;"
-#INFINITY_MODEL_ID="/data/checkpoints/Alibaba-NLP/gte-Qwen2-1.5B-instruct;"
+#INFINITY_MODEL_ID="Alibaba-NLP/gte-Qwen2-1.5B-instruct;"
+INFINITY_MODEL_ID="/data/checkpoints/Alibaba-NLP/gte-Qwen2-1.5B-instruct;"
 INFINITY_MODEL_WARMUP=false
 
 # keep batch size small to save VRAM

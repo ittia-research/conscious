@@ -16,15 +16,15 @@ class Settings(BaseSettings):
 
     # DB others
     GRAPH_NAME: str = "conscious_graph"
-    VECTOR_DIMENSION: int = 1024 # TO-DO: maybe get dimension from model data directly?
+    VECTOR_DIMENSION: int = 1536 # TO-DO: maybe get dimension from model data directly?
 
     # Embedding (default to OpenAI compatible API)
-    EMBEDDING_MODEL: str = "openai/jinaai/jina-embeddings-v3"
+    EMBEDDING_MODEL: str = "openai/Alibaba-NLP/gte-Qwen2-1.5B-instruct"
     EMBEDDING_API_BASE: str = "http://localhost:7997/"
     EMBEDDING_API_KEY: str = 'no_key'
 
     # LLM (default to Gemini)
-    LLM_MODEL: str = "gemini/gemini-2.0-flash-thinking-exp-01-21"
+    LLM_MODEL: str = "gemini/learnlm-1.5-pro-experimental"
     LLM_API_KEY: str = 'no_key'
 
     # DSPy
