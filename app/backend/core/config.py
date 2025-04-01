@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     DSPY_CACHE: bool = True # Turn DSPy cache on or off
     DSPY_CACHEDIR: str = "/tmp/dspy"
 
+    # Experimental parameters
+    DUPLICATE_EMBEDDING_DISTANCE_MAX: float = 0.05 # Consider duplicate if embedding cosine distance below
+
     # Validator for LOG_LEVEL
     @field_validator('LOG_LEVEL_GLOBAL', 'LOG_LEVEL_LiteLLM', mode='before')
     @classmethod

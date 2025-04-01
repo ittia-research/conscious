@@ -11,3 +11,7 @@ Defined with AGE graph. Add some columns to AGE vertices as properties.
 
 ### Vector
 - thoughts: embedding for content, with cosine distance HNSW index enabled
+
+## Parameters
+### Experimental
+- DUPLICATE_EMBEDDING_DISTANCE_MAX: if embeddings of 2 texts cousin distance not above this limit, we consider them identical.

@@ -21,7 +21,7 @@ def setup_age_connection(dbapi_connection, connection_record) -> None:
     try:
         cursor.execute("LOAD 'age';")
         cursor.execute("SET search_path = ag_catalog, '$user', public;")
-        logger.info("AGE loaded and search_path set for new connection.")
+        logger.debug("AGE loaded and search_path set for new connection.")
     except Exception as e:
         logger.error(f"Error setting up AGE for connection: {e}")
     finally:
