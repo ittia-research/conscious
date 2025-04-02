@@ -6,8 +6,8 @@ CREATE TABLE IF NOT EXISTS thoughts (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP -- Timestamp when the record was created
 );
 
--- Create Index on embedding for faster similarity search
-CREATE INDEX ON thoughts USING hnsw (embedding vector_cosine_ops); -- cosine distance
+-- Create a StreamingDiskANN index on embedding for faster similarity search 
+CREATE INDEX thoughts_idx ON thoughts USING diskann (embedding vector_cosine_ops);  -- cosine distance
 
 -- Create the 'sources' table
 CREATE TABLE IF NOT EXISTS sources (

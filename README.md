@@ -48,6 +48,7 @@ And in doing so, hopefully unlock some secrets about conscious.
 
 ## Links
 [Structure](./docs/structure)
+
 [Roadmap](./docs/roadmap.md)
 
 ## Acknowledgements

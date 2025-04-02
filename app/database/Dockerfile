@@ -1,15 +1,16 @@
 # Database for production
 
-# Install extensions: AGE, pgvector
-# References
+# Install extensions: AGE, pgvectorscale (with pgvector)
+# Reference: 
 #   - https://github.com/apache/age/blob/43dcfa57f19a689ef696fad7d3d9b88401f7b2eb/docker/Dockerfile
-#   - https://github.com/pgvector/pgvector/blob/2627c5ff775ae6d7aef0c430121ccf857842d2f2/Dockerfile
+#   - https://github.com/timescale/pgvectorscale/blob/main/DEVELOPMENT.md
+
 
 ARG PG_MAJOR=17
 
 
 # Build: AGE
-FROM postgres:$PG_MAJOR AS build_age
+FROM postgres:${PG_MAJOR}-bookworm AS build_age
 ARG PG_MAJOR
 
 RUN apt-get update \
@@ -29,50 +30,59 @@ RUN git checkout 43dcfa57f19a689ef696fad7d3d9b88401f7b2eb
 RUN make && make install
 
 
-# Final stage
-FROM postgres:$PG_MAJOR
+# Build: pgvectorscale
+FROM postgres:${PG_MAJOR}-bookworm AS build_vector
 ARG PG_MAJOR
 
-RUN apt-get update \
+RUN apt update \
     && apt-get install -y --no-install-recommends --no-install-suggests \
-    locales
+    make gcc pkg-config clang postgresql-server-dev-${PG_MAJOR} libssl-dev \
+    curl git jq ca-certificates
 
-# Build and install pgvector
-RUN apt-mark hold locales \
-    && apt-get install -y --no-install-recommends --no-install-suggests \
-       build-essential \
-       postgresql-server-dev-$PG_MAJOR \
-       ca-certificates git
+# Install rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
-RUN git clone --branch v0.8.0 --depth 1 https://github.com/pgvector/pgvector /tmp/pgvector
+# Download pgvectorscale
+RUN cd /tmp \
+    && git clone --depth 1 --branch 0.7.0 https://github.com/timescale/pgvectorscale
 
-RUN cd /tmp/pgvector && \
-		make clean && \
-		make OPTFLAGS="" && \
-		make install && \
-		mkdir /usr/share/doc/pgvector && \
-		cp LICENSE README.md /usr/share/doc/pgvector && \
-		rm -r /tmp/pgvector && \
-		apt-get remove -y build-essential postgresql-server-dev-$PG_MAJOR && \
-		apt-get autoremove -y && \
-		apt-mark unhold locales && \
-		rm -rf /var/lib/apt/lists/*
+WORKDIR /tmp/pgvectorscale/pgvectorscale
+
+# Install cargo-pgrx with the same version as pgrx
+RUN ~/.cargo/bin/cargo install --locked cargo-pgrx --version $(~/.cargo/bin/cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "pgrx") | .version')
+RUN ~/.cargo/bin/cargo pgrx init --pg${PG_MAJOR} pg_config
+
+# Build pgvectorscale
+# TO-DO: warnings during build
+RUN RUSTFLAGS="-C target-feature=+avx2,+fma" ~/.cargo/bin/cargo pgrx package
+
+# Build pgvector
+RUN cd /tmp \
+    && git clone --depth 1 --branch v0.8.0 https://github.com/pgvector/pgvector \
+    && cd pgvector \
+    && make
+
+
+# Final stage
+FROM postgres:${PG_MAJOR}-bookworm
+ARG PG_MAJOR
 
 # Copy from AGE build
 COPY --from=build_age /usr/lib/postgresql/$PG_MAJOR/lib/age.so /usr/lib/postgresql/$PG_MAJOR/lib/
-COPY --from=build_age /usr/share/postgresql/$PG_MAJOR/extension/age--1.5.0.sql /usr/share/postgresql/$PG_MAJOR/extension/
+COPY --from=build_age /usr/share/postgresql/$PG_MAJOR/extension/age--*.sql /usr/share/postgresql/$PG_MAJOR/extension/
 COPY --from=build_age /usr/share/postgresql/$PG_MAJOR/extension/age.control /usr/share/postgresql/$PG_MAJOR/extension/
+
+# Copy pgvector build
+COPY --from=build_vector /tmp/pgvector/vector.so /usr/lib/postgresql/$PG_MAJOR/lib/
+COPY --from=build_vector /tmp/pgvector/sql/vector--*.sql /usr/share/postgresql/$PG_MAJOR/extension/
+COPY --from=build_vector /tmp/pgvector/vector.control /usr/share/postgresql/$PG_MAJOR/extension/
+
+# Copy pgvectorscale build
+COPY --from=build_vector /tmp/pgvectorscale/target/release/vectorscale-pg${PG_MAJOR}/usr/lib/postgresql/${PG_MAJOR}/lib/vectorscale-*.so /usr/lib/postgresql/$PG_MAJOR/lib/
+COPY --from=build_vector /tmp/pgvectorscale/target/release/vectorscale-pg${PG_MAJOR}/usr/share/postgresql/${PG_MAJOR}/extension/vectorscale--*.sql /usr/share/postgresql/$PG_MAJOR/extension/
+COPY --from=build_vector /tmp/pgvectorscale/target/release/vectorscale-pg${PG_MAJOR}/usr/share/postgresql/${PG_MAJOR}/extension/vectorscale.control /usr/share/postgresql/$PG_MAJOR/extension/
 
 # Copy database initialization scripts for this project
 COPY ./initdb.d /docker-entrypoint-initdb.d
 
-# Final setup
-RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen \
-    && locale-gen \
-    && update-locale LANG=en_US.UTF-8
-
-ENV LANG=en_US.UTF-8
-ENV LC_COLLATE=en_US.UTF-8
-ENV LC_CTYPE=en_US.UTF-8
-
-CMD ["postgres", "-c", "shared_preload_libraries=age,vector"]
+CMD ["postgres", "-c", "shared_preload_libraries=age"]
