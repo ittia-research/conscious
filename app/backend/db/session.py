@@ -19,6 +19,7 @@ def setup_age_connection(dbapi_connection, connection_record) -> None:
     """
     cursor = dbapi_connection.cursor()
     try:
+        print('abc')
         cursor.execute("LOAD 'age';")
         cursor.execute("SET search_path = ag_catalog, '$user', public;")
         logger.debug("AGE loaded and search_path set for new connection.")

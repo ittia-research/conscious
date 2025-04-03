@@ -9,15 +9,6 @@ CREATE TABLE IF NOT EXISTS thoughts (
 -- Create a StreamingDiskANN index on embedding for faster similarity search 
 CREATE INDEX thoughts_idx ON thoughts USING diskann (embedding vector_cosine_ops);  -- cosine distance
 
--- Create the 'sources' table
-CREATE TABLE IF NOT EXISTS sources (
-    source_id BIGSERIAL PRIMARY KEY,     -- Use BIGSERIAL for potentially large tables
-    source_type VARCHAR(50) NOT NULL,    -- Type of the source, e.g., 'url', 'pdf', 'book'
-    identifier TEXT NOT NULL,            -- Unique identifier for the source, e.g., URL, ISBN
-    guid UUID UNIQUE NOT NULL,           -- UUID5 based on type and identifier
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP -- Timestamp when the record was created
-);
-
 -- Setup graph --
 CREATE EXTENSION IF NOT EXISTS age;
 LOAD 'age';  -- Load the AGE extension into the current session's library path

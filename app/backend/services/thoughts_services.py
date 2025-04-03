@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import time
 from typing import List, Optional
@@ -7,7 +8,7 @@ from typing import List, Dict, Any
 from sqlalchemy import text
 
 from db.models import Sources, Thoughts
-from utils.helpers import generate_source_guid, execute_cypher, check_duplicate_row
+from utils.helpers import execute_cypher
 from utils.embeddings import get_embeddings
 from core.config import settings
 
@@ -21,51 +22,59 @@ class ThoughtsService:
     def __init__(self, session: Session):
         self.session = session
 
-    def add_source(self, source_type: str, identifier: str) -> Sources:
-        """Adds a Source to the table and AGE graph if it doesn't exist.
-        Skip if the same row already exist in the table.
+    def add_source(self, keys: dict, properties: dict = {}):
         """
-        source_guid = generate_source_guid(source_type, identifier)
-        columns = {
-            'source_type': source_type,
-            'identifier': identifier,
-            'guid': source_guid
-        }
-
-        # Check if already exist in table
-        existing_source = check_duplicate_row(self.session, Sources, columns)
-        if isinstance(existing_source, Sources):
-            # logger.info(f"Source already exists: {existing_source}")
-            return existing_source
-        elif existing_source is None: # Indicates an error occurred during check
-             # Logged in check_duplicate_row, re-raise error
-            raise Exception(f"Error checking for duplicate in table {Sources.__tablename__}: {columns}")
-        # If existing_source is False, it means no duplicate found, proceed.
-
-        logger.info(f"Adding new source: type='{source_type}', identifier='{identifier}'")
-        db_source = Sources(**columns)
-        self.session.add(db_source)
-        self.session.flush() # Get the auto-generated source_id before graph creation
-        logger.info(f"Relational source created with id: {db_source.source_id}")
-
-        cypher_query = f"""
-        CREATE (s:Source {{
-            pg_table_id: {db_source.source_id},
-            type: '{db_source.source_type}',
-            identifier: '{db_source.identifier}',
-            guid: '{str(db_source.guid)}'
-        }})
-        RETURN id(s)
+        Creates/merges a Source vertex, add or update properties.
+        With keys as a group of identifiers for this source.
         """
+
+        if not keys or not isinstance(keys, dict):
+            raise ValueError("Source vertex keys must be a non-empty dictionary.")
 
         try:
-            graph_result = execute_cypher(self.session, cypher_query)
-            logger.info(f"AGE vertex Source creation result: {graph_result}")
-        except Exception as e:
-            logger.error(f"Failed to create AGE vertex Source for source_id {db_source.source_id}: {e}")
-            raise # Re-raise to ensure transaction rollback
+            # Build the SET clauses
+            set_clauses = ["v.created_at = timestamp()"]
+            cypher_params = {
+                "keys_param": keys
+            }
 
-        return db_source
+            for key, value in properties.items():
+                set_clauses.append(f"v.{key} = ${key}")
+                cypher_params[key] = value
+
+            set_clause_string = ",\n                ".join(set_clauses)
+
+            # Cypher query: add or update properties
+            cypher_query_string = f"""
+                MERGE (v:Source {{ keys: $keys_param }})
+                SET
+                    {set_clause_string}
+                RETURN id(v), properties(v)
+            """
+
+            # !IMPORTANT: use parameter for graph name will result in error
+            sql_command = text(f"""
+                SELECT * FROM cypher(
+                    '{settings.GRAPH_NAME}',
+                    $$ {cypher_query_string} $$,
+                    :cypher_params
+                )
+                AS (id agtype, properties agtype);;
+            """)
+
+            result = self.session.execute(
+                sql_command,
+                { "cypher_params": json.dumps(cypher_params) }
+            )
+
+            vertex_data = result.fetchone()
+            logger.info(f"Added Source vertex, id {vertex_data[0]}, properties {vertex_data[1]}")
+            
+            return vertex_data
+
+        except Exception as e:
+            logger.error(f"Failed to add Source vertex: {e}")
+            raise Exception(e)
 
     def add_thought(self, content: str, source_ids: List[int], embedding: Optional[List[float]] = None) -> Thoughts:
         """Adds a Thought to the DB, creates AGE vertex, and links to sources."""
@@ -139,17 +148,17 @@ class ThoughtsService:
 
         return db_thought
 
-    def add_collection(self, source_type: str, identifier: str, contents: List[str]) -> tuple[List[int], List[int]]:
+    def add_collection(self, contents: List[str], source_keys: dict, source_properties: dict = {}) -> tuple[List[int], List[int]]:
         """Adds a source and multiple thoughts, and link together.
         
         Args:
           - contents: list of thoughts
         """
-        logger.info(f"Adding collection: source='{source_type}:{identifier}', {len(contents)} thoughts.")
+        logger.debug(f"Adding collection: source keys {source_keys}, source properties {source_properties}, {len(contents)} thoughts.")
 
         # Add the source first
-        source = self.add_source(source_type=source_type, identifier=identifier)
-        source_ids = [source.source_id]
+        source = self.add_source(keys=source_keys, properties=source_properties)
+        source_ids = [source[0]]
 
         # Generate embeddings for all contents at once (more efficient potentially)
         thought_ids = []

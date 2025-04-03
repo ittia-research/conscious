@@ -1,3 +1,6 @@
+## Details
+- [ ] Database input sanitization, and keys of properties should not contain `keys`.
+
 ## Minor
 - [ ] Support storage of raw source data instead of just derived thoughts.
 - [ ] Sync to human memory. Methods to consider: flashcard, thoughts map.

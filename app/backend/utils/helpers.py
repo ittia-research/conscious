@@ -12,14 +12,6 @@ from db.session import Base # Needed for type hinting if check_duplicate_row tak
 logger = logging.getLogger(__name__)
 
 
-def generate_source_guid(source_type: str, identifier: str) -> uuid.UUID:
-    # TO-DO: implement namespace
-    """Generates a UUID5 based on the source type and identifier."""
-    namespace = uuid.NAMESPACE_DNS
-    name = f"{source_type}:{identifier}"
-    return uuid.uuid5(namespace, name)
-
-
 def execute_cypher(session: Session, query: str, columns: int = 1) -> List:
     """Executes a Cypher query using AGE."""
     # Define return definition dynamically
@@ -27,7 +19,7 @@ def execute_cypher(session: Session, query: str, columns: int = 1) -> List:
     return_as = ", ".join(_parts)
 
     # Get command
-    command_text = f"SELECT * FROM cypher('{settings.GRAPH_NAME}', $${query.strip()}$$) as ({return_as});"
+    command_text = f"SELECT * FROM cypher('{settings.GRAPH_NAME}', $${query.strip()}$$) AS ({return_as});"
     command = text(command_text)
     logger.debug(f"Executing Cypher command: {command}")
 
