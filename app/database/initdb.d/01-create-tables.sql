@@ -16,7 +16,12 @@ SET search_path = ag_catalog, "$user", public;  -- Set the search path for the c
 SELECT create_graph('conscious_graph');  -- Graph for sources relationships
 SELECT create_vlabel('conscious_graph','Source');
 SELECT create_vlabel('conscious_graph','Thought');
-SELECT create_elabel('conscious_graph','DERIVED_FROM');
+SELECT create_elabel('conscious_graph','DERIVED_TO');
 SELECT create_elabel('conscious_graph','CONTAINS');
+
+-- Create index for label Source
+-- TO-DO: create index for `keys` only
+-- Reference: https://github.com/apache/age/issues/2137
+-- CREATE INDEX IF NOT EXISTS idx_conscious_graph_source ON conscious_graph."Source" USING gin (properties); 
 
 \echo "Database initialization complete."

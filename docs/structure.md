@@ -31,8 +31,8 @@ Design:
 - Generally follow the direction from high to low like water.
 
 Defined by AGE knowledge graph edges:
-- thoughts <--DERIVED_FROM-- one or more sources
-- source --CONTAIN--> one or more sources
+- source --DERIVED_TO--> thought
+- source --CONTAIN--> source
 
 ### Vector
 - thoughts: embedding for text, with cosine distance index enabled

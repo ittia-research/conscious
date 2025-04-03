@@ -18,6 +18,7 @@ nest_asyncio.apply()
 
 logger = logging.getLogger(__name__)
 
+# TO-DO: connection re-create after database server restart.
 class ThoughtsService:
     def __init__(self, session: Session):
         self.session = session
@@ -68,7 +69,7 @@ class ThoughtsService:
             )
 
             vertex_data = result.fetchone()
-            logger.info(f"Added Source vertex, id {vertex_data[0]}, properties {vertex_data[1]}")
+            logger.debug(f"Added Source vertex, id {vertex_data[0]}, properties {vertex_data[1]}")
             
             return vertex_data
 
@@ -136,12 +137,12 @@ class ThoughtsService:
             cypher_query_edge = f"""
             MATCH (t:Thought {{pg_table_id: {thought_id}}})
             MATCH (s:Source {{pg_table_id: {source_id}}})
-            MERGE (t)-[r:DERIVED_FROM]->(s)
+            MERGE (s)-[r:DERIVED_TO]->(t)
             RETURN r
             """
             try:
                 graph_edge_result = execute_cypher(self.session, cypher_query_edge)
-                logger.info(f"AGE DERIVED_FROM edge creation result: {graph_edge_result}")
+                logger.info(f"AGE DERIVED_TO edge creation result: {graph_edge_result}")
             except Exception as e:
                 logger.error(f"Failed linking thought {thought_id} to source {source_id}: {e}")
                 raise
