@@ -192,7 +192,7 @@
 	>
 		<!-- Text Area -->
 		<div>
-			<label for="text" class="block text-sm font-medium text-gray-700 mb-1">Text to Analyze:</label>
+			<label for="text" class="block text-sm font-medium text-gray-700 mb-1">Text:</label>
 			<textarea
 				id="text"
 				name="text"
@@ -232,7 +232,7 @@
                     <!-- Dynamic Identifier Inputs Container -->
                     {#if selectedType && currentIdentifierKeys.length > 0}
                         <div class="space-y-3 p-4 border border-dashed border-gray-200 rounded-md mt-0 md:mt-0"> <!-- Adjust margin if needed -->
-                            <h3 class="text-sm font-medium text-gray-600">Identifiers <span class="text-gray-400 text-xs">(for '{configs[selectedType]?.label ?? selectedType}')</span>:</h3>
+                            <h3 class="text-sm font-medium text-gray-600">Source Identifiers <span class="text-gray-400 text-xs">(for '{configs[selectedType]?.label ?? selectedType}')</span>:</h3>
                             {#each currentIdentifierKeys as key (key)} <!-- Keyed each block -->
                                 {@const fieldConfig = configs[selectedType]?.keys[key]}
                                 {@const isRequired = fieldConfig?.required ?? false}
@@ -286,7 +286,7 @@
                     </svg>
                     Processing...
                 {:else}
-                    Find Thoughts
+                    Think
                 {/if}
             </button>
             {#if !isLoading && isSubmitDisabled && !isDisabled && !loadError}
@@ -309,7 +309,7 @@
             <h2 class="text-xl font-semibold mb-4 text-gray-700">Results</h2>
              <!-- Context for the results -->
             <div class="text-sm text-gray-600 mb-4 p-3 rounded border border-gray-200 bg-white">
-                <p><strong>Source Type:</strong> <code class="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-xs">{configs[form?.selectedType]?.label ?? form?.selectedType ?? 'N/A'}</code></p>
+                <p><strong>Type:</strong> <code class="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-xs">{configs[form?.selectedType]?.label ?? form?.selectedType ?? 'N/A'}</code></p>
                 {#if form?.identifierValues && Object.keys(form.identifierValues).length > 0}
                     <p class="mt-1"><strong>Identifiers:</strong>
                         {#each Object.entries(form.identifierValues) as [key, value]}
@@ -319,12 +319,12 @@
                         {/each}
                     </p>
                 {/if}
-                <p class="mt-1"><strong>Analyzed Text:</strong> <code class="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-xs line-clamp-2" title={form?.text ?? ''}>{form?.text ?? ''}</code></p>
+                <p class="mt-1"><strong>Text:</strong> <code class="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-xs line-clamp-2" title={form?.text ?? ''}>{form?.text ?? ''}</code></p>
              </div>
 
             <!-- List of thoughts -->
             {#if thoughts.length > 0}
-                <h3 class="text-md font-medium text-gray-600 mb-2">Found Thoughts:</h3>
+                <h3 class="text-md font-medium text-gray-600 mb-2">Thoughts:</h3>
                 <ul class="space-y-2 list-disc list-inside bg-white p-4 rounded-md border border-gray-200">
                     {#each thoughts as thought, i (i)}
                         <li class="text-gray-800">{thought}</li>

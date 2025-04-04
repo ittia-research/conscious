@@ -1,27 +1,13 @@
-import { env } from '$env/dynamic/private'; // Keep if other env vars are needed, otherwise removable
 import { fail } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './$types'; // Corrected type import path if necessary
+import type { Actions, PageServerLoad } from './$types';
 import { findThoughts, configsSources } from '$lib/server/api.client';
 import type { ApiError, IdentifierValues } from '$lib/types';
 
-// --- Load Function ---
-// This runs on the server before the page component is rendered
+// Runs on the server before the page component is rendered
 export const load: PageServerLoad = async () => {
-    // Return only the necessary configuration data.
-    // Handle potential errors if loading configsSources could fail.
-    try {
-        const configs = await configsSources; // Assuming configsSources might be async or needs resolution
-        return {
-            configs: configs ?? {} // Provide an empty object if null/undefined
-        };
-    } catch (error) {
-        console.error("Failed to load configuration sources:", error);
-        // Return an error state that the frontend can handle
-        return {
-            configs: {},
-            loadError: "Failed to load configuration sources. Please try again later."
-        };
-    }
+    return {
+        configs: configsSources
+    };
 }; 
 
 // --- Actions Object ---
@@ -117,11 +103,11 @@ export const actions: Actions = {
 
 		// --- Call the API ---
 		try {
-            console.log('Calling findThoughts with:', { effectiveText, effectiveSelectedType, identifierValues }); // Debug log
+            console.debug('Calling findThoughts with:', { effectiveText, effectiveSelectedType, identifierValues });
             const thoughts = await findThoughts(
                 effectiveText,
                 effectiveSelectedType,
-                identifierValues // Pass the correctly collected identifiers
+                identifierValues
             );
 
 			// Return success data

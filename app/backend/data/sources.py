@@ -24,23 +24,31 @@ define_sources = {
                 'examples': [
                     '9781567926859'
                 ],
-            },
-            'isbn_test': {'label': 'ISBN Test', 'required': False}
+            }
         },
-        'label': "Book"
+        'label': "book" # Same as type, here for demonstration only
     },
     'website': {
         'keys': {
             'url': {
                 # TO-DO: can we have a standard approach to sanitize URL? 
-                'name': 'URL',
+                'label': 'URL',
                 'required': True,
                 'desc': "Uniform Resource Locator",
                 'examples': [
                     'https://www.wikipedia.org'
                 ]
             }
+        }
+    },
+    'dev-test': {
+        'keys': {
+            'test_identifier_1': {
+                'label': 'Test Identifier 1',
+                'required': True,
+            },
+            'test_identifier_2': {}
         },
-        'label': 'Website'
-    }, 
+        'label': 'Dev Test'
+    },
 }
