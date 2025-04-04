@@ -93,7 +93,7 @@ class ThoughtsService:
             logger.error(f"Failed to add Source vertex: {e}")
             raise Exception(e)
 
-    def add_thought(self, content: str, source_ids: List[int], embedding: Optional[List[float]] = None) -> Thoughts:
+    def add_thought(self, text: str, source_ids: List[int], embedding: Optional[List[float]] = None) -> Thoughts:
         """Adds a Thought to the DB, creates AGE vertex, and links to sources."""
         if not source_ids:
             raise ValueError("At least one source_id must be provided.")
@@ -102,25 +102,25 @@ class ThoughtsService:
             if len(embedding) != settings.VECTOR_DIMENSION:
                 raise ValueError(f"Provided embedding dimension {len(embedding)} != required {settings.VECTOR_DIMENSION}")
         else:
-            embedding = asyncio.run(get_embeddings([content]))[0]
+            embedding = asyncio.run(get_embeddings([text]))[0]
 
         # Check for duplication
         duplicate = self.find_similar_content(
-                        texts_to_check = [content],
+                        texts_to_check = [text],
                         embeddings = [embedding],
                         id_column = 'thought_id',
-                        text_column = 'content',
+                        text_column = 'text',
                         table_name = 'thoughts',
                         limit = 1,
                         distance_max = settings.DUPLICATE_EMBEDDING_DISTANCE_MAX,
                     )[0]['neighbors']
         if duplicate:
-            logger.info(f"Duplicate found in table '{Thoughts.__tablename__}' with embedding distance {duplicate[0]['distance']}, original text: {content}")
+            logger.info(f"Duplicate found in table '{Thoughts.__tablename__}' with embedding distance {duplicate[0]['distance']}, original text: {text}")
             thought_id = duplicate[0]['id']
             # TO-DO: shall we create locally or fetch from db to match the result below?
-            db_thought = Thoughts(thought_id=thought_id, content=duplicate[0]['text'])
+            db_thought = Thoughts(thought_id=thought_id, text=duplicate[0]['text'])
         else:
-            db_thought = Thoughts(content=content, embedding=embedding)
+            db_thought = Thoughts(text=text, embedding=embedding)
             self.session.add(db_thought)
             self.session.flush() # Get the thought_id
             thought_id = db_thought.thought_id # TO-DO: could it be invalid?
@@ -187,7 +187,7 @@ class ThoughtsService:
             for index, content in enumerate(contents):
                 embed = embeddings[index]
                 thought = self.add_thought(
-                    content=content, 
+                    text=content, 
                     source_ids=source_ids, 
                     embedding=embed
                 )

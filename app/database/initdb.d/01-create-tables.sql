@@ -1,8 +1,8 @@
 -- Create the 'thoughts' table
 CREATE TABLE IF NOT EXISTS thoughts (
     thought_id BIGSERIAL PRIMARY KEY,       -- Use BIGSERIAL for potentially large tables
-    text TEXT NOT NULL,                     -- The text content
-    embedding VECTOR(1536) NOT NULL,        -- The vector embedding. Replace the dimension number.
+    text TEXT NOT NULL,                     -- Text content
+    embedding VECTOR(1536) NOT NULL,        -- Vector embedding. Replace the dimension number.
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP -- Timestamp when the record was created
 );
 
