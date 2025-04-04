@@ -1,14 +1,23 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { findThoughts, configsSources } from '$lib/server/api.client';
+import { findThoughts, getConfigsSources } from '$lib/server/api.client';
 import type { ApiError, IdentifierValues } from '$lib/types';
 
 // Runs on the server before the page component is rendered
 export const load: PageServerLoad = async () => {
-    return {
-        configs: configsSources
-    };
-}; 
+    try {
+        const configs = await getConfigsSources();
+        return {
+            configs: configs ?? {} // Provide an empty object if null/undefined
+        };
+    } catch (error) {
+        console.error("Failed to load configuration sources:", error);
+        return {
+            configs: {},
+            loadError: "Failed to load configuration sources. Please try again later."
+        };
+    }
+};
 
 // --- Actions Object ---
 // This handles form submissions

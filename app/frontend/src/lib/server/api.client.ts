@@ -70,18 +70,7 @@ async function makeApiRequest<T>(options: RequestOptions): Promise<T> {
 	}
 }
 
-// --- Specific API endpoint functions ---
-
-/**
- * Calls the POST /find endpoint of the backend API.
- * @param text - The text input.
- * @param identifier - The identifier input.
- * @returns A promise resolving to the list of thoughts.
- * @throws {ApiError} If the API request fails.
- */
-
-            // async function findThoughtsUpdated(params: { text: string, type: string, identifiers: IdentifierValues }) { /* ... */ }
-
+// Get thoughts from backend
 export async function findThoughts(text: string, type: string, identifiers: IdentifierValues): Promise<string[]> {
 	try {
 		const response = await makeApiRequest<FindApiResponse>({
@@ -96,8 +85,8 @@ export async function findThoughts(text: string, type: string, identifiers: Iden
 	}
 }
  
-// Get configs of: sources
-async function getConfigsSources() {
+// Get configs of sources
+export async function getConfigsSources() {
 	try {
 		const response = await makeApiRequest<ConfigsApiResponse>({
 			endpoint: '/v1/configs/sources',
@@ -109,14 +98,3 @@ async function getConfigsSources() {
 		throw error;
 	}
 }
-
-// --- Fetch Configs Once on Server Start ---
-console.log('Server module initializing: fetching source configurations...');
-export const configsSources = await getConfigsSources()
-	.then(configs => {
-		console.log('Source configurations loaded successfully.');
-		return configs;
-	})
-	.catch(err => {
-		throw new Error("CRITICAL: Failed to fetch initial source configurations on server start.", err);
-	});
