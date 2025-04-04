@@ -192,7 +192,7 @@
 	>
 		<!-- Text Area -->
 		<div>
-			<label for="text" class="block text-sm font-medium text-gray-700 mb-1">Text:</label>
+			<label for="text" class="block text-sm font-medium text-gray-700 mb-1">Text <span class="text-red-500 ml-1">*</span>:</label>
 			<textarea
 				id="text"
 				name="text"
