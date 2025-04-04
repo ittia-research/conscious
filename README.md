@@ -47,7 +47,7 @@ And in doing so, hopefully unlock some secrets about conscious.
 - No word salad.
 
 ## Links
-[Structure](./docs/structure)
+[Structure](./docs/structure.md)
 
 [Roadmap](./docs/roadmap.md)
 
