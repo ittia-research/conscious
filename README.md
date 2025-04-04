@@ -51,6 +51,8 @@ And in doing so, hopefully unlock some secrets about conscious.
 
 [Roadmap](./docs/roadmap.md)
 
+[Research](./docs/research.md)
+
 ## Acknowledgements
 - TPU Research Cloud team at Google
 - Google (Gemini, Search)

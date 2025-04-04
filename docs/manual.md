@@ -1,6 +1,10 @@
 Manual on how to use.
 
 ## Self-hosting
+Prepare:
+- Update env in corresponding files.
+- Create MinIO bucket and API key manually.
+
 ### For Production
 ```bash
 git clone https://github.com/ittia-research/conscious
