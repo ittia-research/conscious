@@ -2,12 +2,12 @@ import asyncio
 import json
 import logging
 import time
-from typing import List, Optional
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sqlalchemy import text
 
 from db.models import Sources, Thoughts
+from db.s3 import upload_texts_to_s3
 from utils.helpers import execute_cypher
 from utils.embeddings import get_embeddings
 from core.config import settings
@@ -23,16 +23,25 @@ class ThoughtsService:
     def __init__(self, session: Session):
         self.session = session
 
-    def add_source(self, keys: dict, properties: dict = {}):
+    def add_source(self, keys: dict, properties: dict = {}, contents: List[str] = []):
         """
         Creates/merges a Source vertex, add or update properties.
         With keys as a group of identifiers for this source.
+        Upload contents to S3 and save list of links.
         """
 
         if not keys or not isinstance(keys, dict):
             raise ValueError("Source vertex keys must be a non-empty dictionary.")
 
         try:
+            # TO-DO: move save contents logic out
+            # Upload contents to S3
+            content_link = []
+            if contents:
+                content_link = upload_texts_to_s3(contents, bucket_name='sources')
+                content_link = [i for i in content_link if i] # Remove empty ones if any
+            properties['contents'] = content_link
+
             # Build the SET clauses
             set_clauses = ["v.created_at = timestamp()"]
             cypher_params = {

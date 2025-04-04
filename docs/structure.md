@@ -21,6 +21,11 @@ Sources (Knowledge Graph vertex)
   - properties: other data related
 - used for define sources, establish relationship with thoughts and other sources
 
+S3 (object storage):
+- buckets:
+  - sources
+- used to save original data, for example long text or uploaded files.
+
 ### Identifier
 The goal is to identify an entity internally, globally, and across time.
 It's likely identifier won't be able to cover our needs forever. Partly because we might add new dimensions into our understanding.

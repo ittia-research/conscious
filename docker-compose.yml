@@ -41,6 +41,7 @@ services:
     #   - "8000:8000"
     depends_on:
       - prod-database
+      - minio
     profiles: ["prod"]
     networks:
       - prod_network
@@ -136,6 +137,7 @@ services:
       " # Add --reload for development
     depends_on:
       - dev-database
+      - minio
     profiles: ["dev"]
     networks:
       - dev_network
@@ -194,6 +196,29 @@ services:
   # ==                       Start Profile Utils                       ==
   # =====================================================================
 
+
+  # MinIO Object Storage
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-04-03T14-56-28Z
+    command: server /data --console-address ":9001"
+    ports:
+      - '19000:9000'
+      - '19001:9001'
+    env_file:
+      - ./infra/env.d/s3
+      - ./infra/env.d/.private
+    volumes:
+      - /data/volumes/minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    profiles: ["dev", "prod"]
+    networks:  # Available to both dev and prod
+      - dev_network
+      - prod_network
+    restart: unless-stopped
 
   # Infinity inference server for embedding, rerank, etc.
   infinity:

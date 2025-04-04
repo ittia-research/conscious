@@ -1,7 +1,7 @@
 -- Create the 'thoughts' table
 CREATE TABLE IF NOT EXISTS thoughts (
     thought_id BIGSERIAL PRIMARY KEY,       -- Use BIGSERIAL for potentially large tables
-    content TEXT NOT NULL,                  -- The text content
+    text TEXT NOT NULL,                     -- The text content
     embedding VECTOR(1536) NOT NULL,        -- The vector embedding. Replace the dimension number.
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP -- Timestamp when the record was created
 );
@@ -20,7 +20,7 @@ SELECT create_elabel('conscious_graph','DERIVED_TO');
 SELECT create_elabel('conscious_graph','CONTAINS');
 
 -- Create index for label Source
--- TO-DO: create index for `keys` only
+-- TO-DO: create index for `keys` only abd verify
 -- Reference: https://github.com/apache/age/issues/2137
 -- CREATE INDEX IF NOT EXISTS idx_conscious_graph_source ON conscious_graph."Source" USING gin (properties); 
 

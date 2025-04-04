@@ -1,3 +1,4 @@
+boto3==1.37.27
 dspy-ai==2.6.16
 fastapi==0.115.12
 litellm==1.65.0
