@@ -84,17 +84,50 @@ export async function findThoughts(text: string, type: string, identifiers: Iden
 		throw error;
 	}
 }
- 
-// Get configs of sources
-export async function getConfigsSources() {
-	try {
-		const response = await makeApiRequest<ConfigsApiResponse>({
-			endpoint: '/v1/configs/sources',
-			method: 'GET'
-		});
-		return response.configs || {};
-	} catch (error) {
-		console.error('Error in findThoughts:', error);
-		throw error;
-	}
+
+
+// == Get configs of sources with caching ==
+export interface ConfigsType {
+    [key: string]: any;
+}
+
+let cachedConfigs: ConfigsType | null = null;
+let fetchPromise: Promise<ConfigsType> | null = null;
+
+/**
+ * Ensures the fetch happens only once per server instance lifetime.
+ * Handles concurrent requests gracefully.
+ */
+export async function getConfigsSources(): Promise<ConfigsType> {
+    // Return cached data if available
+    if (cachedConfigs !== null) {
+        return cachedConfigs;
+    }
+
+    // Return existing promise if fetch is in progress
+    if (fetchPromise !== null) {
+        return fetchPromise;
+    }
+
+    // Initiate the fetch
+    console.log('Initiating config fetch via server API client...');
+    fetchPromise = (async (): Promise<ConfigsType> => {
+        try {
+            const response = await makeApiRequest<ConfigsApiResponse>({
+                endpoint: '/v1/configs/sources',
+                method: 'GET',
+            });
+
+            const configs = response.configs || {};
+            cachedConfigs = configs; // Cache the result on success
+            console.log('Configs fetched and cached successfully.');
+            return configs;
+        } catch (error) {
+            console.error('Error in getConfigSourcesFromServer:', error);
+            fetchPromise = null; // Reset promise on error to allow retries on subsequent requests
+            throw error; // Re-throw so the caller (load function) knows about the failure
+        }
+    })();
+
+    return fetchPromise;
 }

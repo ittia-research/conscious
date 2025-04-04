@@ -17,7 +17,7 @@ export const load: PageServerLoad = async () => {
             loadError: "Failed to load configuration sources. Please try again later."
         };
     }
-};
+}; 
 
 // --- Actions Object ---
 // This handles form submissions
@@ -54,7 +54,7 @@ export const actions: Actions = {
         // --- Load configurations ---
         let configs;
         try {
-            configs = await configsSources; // Reload or ensure available
+            configs = await getConfigsSources(); // Reload or ensure available
         } catch (error) {
              console.error("Failed to load configuration sources during action:", error);
              return fail(500, {
