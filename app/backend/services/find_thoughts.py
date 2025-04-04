@@ -45,25 +45,22 @@ class FindThoughtsModule(dspy.Module):
     
 
 class FindThoughts:
-    def __init__(self, text: str, identifier: str):
+    def __init__(self, text: str, identifiers: str):
         self.text = text
-        self.identifier = identifier
+        self.identifiers = identifiers
 
-    def save_to_db(self, texts, identifier):
+    def save_to_db(self, texts):
         with get_db_session() as session:
             thoughts_service = ThoughtsService(session)
             source_ids, thought_ids = thoughts_service.add_collection(
-                source_type='TO-DO', 
-                identifier=identifier,
-                contents=texts
+                contents=texts,
+                source_keys=self.identifiers,
+                source_contents=[self.text]
             )
 
     def find(self):
         """Inference and save to database"""
         finder = FindThoughtsModule()
         thoughts = finder(self.text)
-        logger.debug(f"Type of thoughts: {type(thoughts)} -> {thoughts}")  # dev
-        # temp-dev
-        # thoughts = ['dev thought 1', "dev thought 2"]
-        self.save_to_db(thoughts, self.identifier)
+        self.save_to_db(thoughts)
         return thoughts

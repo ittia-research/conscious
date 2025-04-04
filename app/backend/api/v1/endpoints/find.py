@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Any
+from typing import List, Any, Dict
 
 from services.find_thoughts import FindThoughts
 from utils.validators import decode_unicode_escapes_logic
@@ -13,11 +13,12 @@ router = APIRouter()
 
 
 class FindRequest(BaseModel):
-    text: str = Field(..., description="The text content to be summarized.")
-    identifier: str = Field(..., description="A unique identifier for this text/request.")
+    text: str = Field(..., min_length=1, description="Original text")
+    type: str = Field(..., min_length=1, description="Type of the source")
+    identifiers: Dict[str, str] = Field(..., min_length=1, description="Identifiers in addition to source type")
 
     # Decode unicode escape
-    @field_validator('text', 'identifier', mode='before')
+    @field_validator('text', mode='before')
     @classmethod
     def decode_fields(cls, v: Any):
         return decode_unicode_escapes_logic(v)
@@ -33,17 +34,18 @@ async def find_thoughts_from_text(request: FindRequest):
     Receives text and an identifier, extracts main thoughts using an LLM,
     saves them to a (simulated) database, and returns the thoughts.
     """
-    identifier = request.identifier.strip()
     text = request.text.strip()
+    type = request.type
+    identifiers = request.identifiers
+
+    # Add type to identifiers
+    identifiers['type'] = type
 
     if not text:
         raise HTTPException(status_code=400, detail="Input text cannot be empty.")
-    logger.debug(f"Received find request for identifier: {request.identifier} -> text: {text}")
+    logger.debug(f"Received find request for {identifiers} -> text: {text}")
 
-    if not identifier:
-        identifier = "TO-DO"
-
-    find_thoughts = FindThoughts(text=text, identifier=identifier)
+    find_thoughts = FindThoughts(text=text, identifiers=identifiers)
     thoughts = find_thoughts.find()
 
     return FindResponse(thoughts=thoughts)

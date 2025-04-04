@@ -1,10 +1,14 @@
 import boto3
 import hashlib
+import logging
 
 from datetime import datetime
 from typing import List, Optional
 from botocore.exceptions import ClientError
 
+from core.config import settings
+
+logger = logging.getLogger(__name__)
 
 def upload_texts_to_s3(
     texts: List[str],
@@ -37,25 +41,24 @@ def upload_texts_to_s3(
     try:
         s3_client = boto3.client(
             's3',
-            endpoint_url=S3_ENDPOINT_URL,
-            aws_access_key_id=S3_ACCESS_KEY,
-            aws_secret_access_key=S3_SECRET_KEY,
+            endpoint_url=settings.S3_ENDPOINT_URL,
+            aws_access_key_id=settings.S3_ACCESS_KEY,
+            aws_secret_access_key=settings.S3_SECRET_KEY,
         )
         # Verify bucket exists and is accessible
         s3_client.head_bucket(Bucket=bucket_name)
-        print(f"Successfully connected to S3 bucket '{bucket_name}'.")
 
     except ClientError as e:
         error_code = e.response.get('Error', {}).get('Code')
         if error_code == 'NoSuchBucket':
-            print(f"Error: Bucket '{bucket_name}' does not exist.")
+            logger.error(f"Bucket '{bucket_name}' does not exist.")
         elif error_code == '403':
-             print(f"Error: Access denied to bucket '{bucket_name}'. Check credentials/permissions.")
+            logger.error(f"Access denied to bucket '{bucket_name}'. Check credentials/permissions.")
         else:
-            print(f"Error connecting to S3 or accessing bucket '{bucket_name}': {e}")
+            logger.error(f"Error connecting to S3 or accessing bucket '{bucket_name}': {e}")
         raise
     except Exception as e:
-        print(f"An unexpected error occurred creating the S3 client or accessing the bucket: {e}")
+        logger.error(f"An unexpected error occurred creating the S3 client or accessing the bucket: {e}")
         raise
 
     endpoint_url = s3_client.meta.endpoint_url
@@ -69,13 +72,13 @@ def upload_texts_to_s3(
         object_key = None
 
         if not isinstance(text_content, str):
-             print(f"Skipping item {index+1}/{len(texts)}: Input is not a string ({type(text_content)}).")
-             uploaded_urls.append(None)
-             continue
+            logger.warning(f"Skipping item {index+1}/{len(texts)}: Input is not a string ({type(text_content)}).")
+            uploaded_urls.append(None)
+            continue
         if not text_content:
-             print(f"Skipping item {index+1}/{len(texts)}: Input string is empty.")
-             uploaded_urls.append(None)
-             continue
+            logger.warning(f"Skipping item {index+1}/{len(texts)}: Input string is empty.")
+            uploaded_urls.append(None)
+            continue
 
         try:
             text_bytes = text_content.encode('utf-8')
@@ -83,8 +86,6 @@ def upload_texts_to_s3(
             file_hash = hashlib.blake2b(text_bytes, digest_size=16).hexdigest()
             object_key = f"{date_prefix}/{file_hash}.txt"
             potential_url = f"{base_url_prefix}/{object_key}"
-
-            print(f"Uploading text {index+1}/{len(texts)} to s3://{bucket_name}/{object_key}...")
 
             put_object_args = {
                 'Bucket': bucket_name,
@@ -95,11 +96,11 @@ def upload_texts_to_s3(
 
             s3_client.put_object(**put_object_args)
             object_url = potential_url
-            print(f"Successfully uploaded. URL: {object_url}")
+            logger.debug(f"Successfully uploaded to S3. URL: {object_url}")
 
         except Exception as e:
             key_info = f"s3://{bucket_name}/{object_key}" if object_key else "unknown key"
-            print(f"Error processing text {index+1}/{len(texts)} for {key_info}: {e}")
+            logger.error(f"Error processing text {index+1}/{len(texts)} for {key_info}: {e}")
 
         uploaded_urls.append(object_url) # Append URL or None
 

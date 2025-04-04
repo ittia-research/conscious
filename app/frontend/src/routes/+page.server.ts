@@ -1,73 +1,149 @@
-import { env } from '$env/dynamic/private'; // To read server-side environment variables
+import { env } from '$env/dynamic/private'; // Keep if other env vars are needed, otherwise removable
 import { fail } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './api/$types'; // Add PageServerLoad
-import { findThoughts } from '$lib/server/api.client';
-import type { ApiError } from '$lib/types';
-
-// --- Define Default Values ---
-const DEFAULT_TEXT = `More than ever before, the Renaissance stands as one of the defining moments in world history. Between 1400 and 1600, European perceptions of society, culture, politics and even humanity itself emerged in ways that continue to affect not only Europe but the entire world.
-
-This wide-ranging exploration of the Renaissance sees the period as a time of unprecedented intellectual excitement and cultural experimentation and interaction on a global scale, alongside a darker side of religion, intolerance, slavery, and massive inequality of wealth and status. It guides the reader through the key issues that defined the period, from its art, architecture, and literature, to advancements in the fields of science, trade, and travel. In its incisive account of the complexities of the political and religious upheavals of the period, the book argues that Europe's reciprocal relationship with its eastern neighbours offers us a timely perspective on the Renaissance that still has much to teach us today.`;
-const DEFAULT_IDENTIFIER = "text_demo_1";
+import type { Actions, PageServerLoad } from './$types'; // Corrected type import path if necessary
+import { findThoughts, configsSources } from '$lib/server/api.client';
+import type { ApiError, IdentifierValues } from '$lib/types';
 
 // --- Load Function ---
 // This runs on the server before the page component is rendered
 export const load: PageServerLoad = async () => {
-    // Read the environment variable. Check specifically for the string 'true'.
-    const isLocked = env.FRONTEND_LOCK === 'true';
-
-    // Return the lock status and the default values.
-    // This object will be available as the `data` prop in +page.svelte
-    return {
-        isLocked: isLocked,
-        defaultText: DEFAULT_TEXT,
-        defaultIdentifier: DEFAULT_IDENTIFIER
-    };
-};
+    // Return only the necessary configuration data.
+    // Handle potential errors if loading configsSources could fail.
+    try {
+        const configs = await configsSources; // Assuming configsSources might be async or needs resolution
+        return {
+            configs: configs ?? {} // Provide an empty object if null/undefined
+        };
+    } catch (error) {
+        console.error("Failed to load configuration sources:", error);
+        // Return an error state that the frontend can handle
+        return {
+            configs: {},
+            loadError: "Failed to load configuration sources. Please try again later."
+        };
+    }
+}; 
 
 // --- Actions Object ---
 // This handles form submissions
 export const actions: Actions = {
 	findThoughts: async ({ request }) => {
 		const formData = await request.formData();
-		const text = formData.get('text') as string;
-		const identifier = formData.get('identifier') as string;
+		const text = formData.get('text'); // Keep as FormDataEntryValue initially
+		const selectedType = formData.get('selectedType'); // Keep as FormDataEntryValue
 
-        // Use the values submitted, which might be the defaults if locked
-		const effectiveText = text;
-        const effectiveIdentifier = identifier;
-
-		if (!effectiveText || !effectiveIdentifier) {
-			// Return submitted values along with the error
+        // Validate base types first
+        if (!text || typeof text !== 'string' || text.trim() === '') {
+            // Return partial data for repopulation
 			return fail(400, {
-                error: 'Text and Identifier are required.',
-                text: effectiveText, // Return potentially null/empty values
-                identifier: effectiveIdentifier
+                error: 'Text field cannot be empty.',
+                text: '', // Keep text empty on this specific error
+                selectedType: typeof selectedType === 'string' ? selectedType : null,
+                identifierValues: {} // Clear identifiers if text is missing
             });
 		}
+        if (!selectedType || typeof selectedType !== 'string' || selectedType.trim() === '') {
+             // Return partial data for repopulation
+            return fail(400, {
+                error: 'A source type must be selected.',
+                text: text, // Keep entered text
+                selectedType: null,
+                identifierValues: {} // Clear identifiers if type is missing
+             });
+        }
 
+        // Ensure text and selectedType are strings now
+        const effectiveText = text.toString().trim();
+        const effectiveSelectedType = selectedType.toString().trim();
+
+        // --- Load configurations ---
+        let configs;
+        try {
+            configs = await configsSources; // Reload or ensure available
+        } catch (error) {
+             console.error("Failed to load configuration sources during action:", error);
+             return fail(500, {
+                error: 'Server configuration error. Please try again later.',
+                text: effectiveText,
+                selectedType: effectiveSelectedType,
+                identifierValues: {}
+            });
+        }
+
+        // --- Determine Expected Identifier Keys ---
+        const typeConfig = configs?.[effectiveSelectedType];
+        const expectedKeys = typeConfig?.keys ? Object.keys(typeConfig.keys) : [];
+        let identifierValues: IdentifierValues = {};
+        let validationError: string | null = null;
+
+        // --- Validate and collect identifier values ---
+        for (const key of expectedKeys) {
+            const formKey = `identifier_${key}`;
+            const value = formData.get(formKey);
+            const isRequired = typeConfig.keys[key]?.required ?? false; // Check if key is required (assuming this structure)
+
+            if (isRequired && (!value || typeof value !== 'string' || value.trim() === '')) {
+                console.log(`Missing required identifier: ${key}`);
+                validationError = `Please fill in the required identifier: '${key}'.`;
+                // Collect partially filled values for repopulation *before* breaking
+                // Need to iterate through *all* expected keys first to get existing values
+                 for (const k of expectedKeys) {
+                    const v = formData.get(`identifier_${k}`);
+                    if (v && typeof v === 'string') {
+                         identifierValues[k] = v;
+                    }
+                 }
+                break; // Stop checking if a required one is missing
+            }
+
+            if (value && typeof value === 'string') {
+                 identifierValues[key] = value.trim();
+            } else if (!value && !isRequired) {
+                 // Optional field is empty, potentially assign null or omit, based on backend needs
+                 // identifierValues[key] = null; // Example if backend expects null
+            }
+        }
+
+
+        // If a validation error occurred during identifier check
+        if (validationError) {
+            return fail(400, {
+                error: validationError,
+                text: effectiveText,
+                selectedType: effectiveSelectedType,
+                identifierValues // Return partially filled values
+            });
+        }
+
+		// --- Call the API ---
 		try {
-			// Call the API client function with the effective values
-			const thoughts = await findThoughts(effectiveText, effectiveIdentifier);
+            console.log('Calling findThoughts with:', { effectiveText, effectiveSelectedType, identifierValues }); // Debug log
+            const thoughts = await findThoughts(
+                effectiveText,
+                effectiveSelectedType,
+                identifierValues // Pass the correctly collected identifiers
+            );
 
-			// Return success data, including the inputs used, for the form
+			// Return success data
 			return {
                 success: true,
                 thoughts: thoughts,
-                text: effectiveText,         // Return the text used
-                identifier: effectiveIdentifier // Return the identifier used
+                // Return the inputs used for display consistency
+                text: effectiveText,
+                selectedType: effectiveSelectedType,
+                identifierValues: identifierValues
             };
 
 		} catch (error: unknown) {
-			const apiError = error as ApiError & { status?: number }; // Type assertion remains useful
-			console.error('Failed action in /find page:', apiError);
+			const apiError = error as ApiError & { status?: number };
+			console.error('Failed action in /find page (findThoughts call):', apiError);
 
-            // Use the status and message from the structured error
-            // Return submitted values along with the error
+			// Return failure data, including the inputs that caused the error
 			return fail(apiError.status || 500, {
-                error: apiError.message || 'An unexpected error occurred.',
-                text: effectiveText, // Return the text that caused the error
-                identifier: effectiveIdentifier // Return the identifier that caused the error
+                error: apiError.message || 'An unexpected error occurred during thought retrieval.',
+                text: effectiveText,
+                selectedType: effectiveSelectedType,
+                identifierValues: identifierValues // Return submitted identifiers on error
             });
 		}
 	}

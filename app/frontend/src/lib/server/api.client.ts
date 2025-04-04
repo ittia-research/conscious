@@ -1,5 +1,5 @@
 import { env } from '$env/dynamic/private';
-import type { FindApiResponse, ApiError } from '$lib/types';
+import type { ConfigsApiResponse, FindApiResponse, ApiError, IdentifierValues } from '$lib/types';
 
 // --- Helper for making authenticated requests ---
 interface RequestOptions extends Omit<RequestInit, 'body'> {
@@ -79,12 +79,15 @@ async function makeApiRequest<T>(options: RequestOptions): Promise<T> {
  * @returns A promise resolving to the list of thoughts.
  * @throws {ApiError} If the API request fails.
  */
-export async function findThoughts(text: string, identifier: string): Promise<string[]> {
+
+            // async function findThoughtsUpdated(params: { text: string, type: string, identifiers: IdentifierValues }) { /* ... */ }
+
+export async function findThoughts(text: string, type: string, identifiers: IdentifierValues): Promise<string[]> {
 	try {
 		const response = await makeApiRequest<FindApiResponse>({
 			endpoint: '/v1/find',
 			method: 'POST',
-			body: { text, identifier }
+			body: { text, type, identifiers }
 		});
 		return response.thoughts || [];
 	} catch (error) {
@@ -92,3 +95,28 @@ export async function findThoughts(text: string, identifier: string): Promise<st
 		throw error;
 	}
 }
+ 
+// Get configs of: sources
+async function getConfigsSources() {
+	try {
+		const response = await makeApiRequest<ConfigsApiResponse>({
+			endpoint: '/v1/configs/sources',
+			method: 'GET'
+		});
+		return response.configs || {};
+	} catch (error) {
+		console.error('Error in findThoughts:', error);
+		throw error;
+	}
+}  
+
+// --- Fetch Configs Once on Server Start ---
+console.log('Server module initializing: fetching source configurations...');
+export const configsSources = await getConfigsSources()
+	.then(configs => {
+		console.log('Source configurations loaded successfully.');
+		return configs;
+	})
+	.catch(err => {
+		throw new Error("CRITICAL: Failed to fetch initial source configurations on server start.", err);
+	});

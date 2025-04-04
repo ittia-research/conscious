@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 from sqlalchemy import text
 
-from db.models import Sources, Thoughts
+from db.models import Thoughts
 from db.s3 import upload_texts_to_s3
 from utils.helpers import execute_cypher
 from utils.embeddings import get_embeddings
@@ -28,6 +28,13 @@ class ThoughtsService:
         Creates/merges a Source vertex, add or update properties.
         With keys as a group of identifiers for this source.
         Upload contents to S3 and save list of links.
+
+        Args:
+          - keys: dict of identifiers including type
+          - properties: additional properties for vertex
+          - contents: list of original contents of this source
+
+        TO-DO: keys must contains type and at least another identifier.
         """
 
         if not keys or not isinstance(keys, dict):
@@ -78,7 +85,7 @@ class ThoughtsService:
             )
 
             vertex_data = result.fetchone()
-            logger.debug(f"Added Source vertex, id {vertex_data[0]}, properties {vertex_data[1]}")
+            logger.debug(f"Added Source vertex: id {vertex_data[0]}, properties {vertex_data[1]}")
             
             return vertex_data
 
@@ -135,13 +142,6 @@ class ThoughtsService:
 
         # Link thought to each source vertex in AGE
         for source_id in source_ids:
-            # Optional: Verify source_id exists in DB first for robustness
-            source_exists = self.session.get(Sources, source_id)
-            if not source_exists:
-                 logger.error(f"Cannot link thought {thought_id}: Source with pg_table_id {source_id} not found in DB.")
-                 raise ValueError(f"Source with id {source_id} does not exist.")
-
-
             logger.info(f"Linking thought {thought_id} to source {source_id}")
             cypher_query_edge = f"""
             MATCH (t:Thought {{pg_table_id: {thought_id}}})
@@ -158,7 +158,12 @@ class ThoughtsService:
 
         return db_thought
 
-    def add_collection(self, contents: List[str], source_keys: dict, source_properties: dict = {}) -> tuple[List[int], List[int]]:
+    def add_collection(self, 
+                       contents: List[str], 
+                       source_keys: dict, 
+                       source_properties: dict = {},
+                       source_contents: List[str] = []
+                    ) -> tuple[List[int], List[int]]:
         """Adds a source and multiple thoughts, and link together.
         
         Args:
@@ -167,7 +172,7 @@ class ThoughtsService:
         logger.debug(f"Adding collection: source keys {source_keys}, source properties {source_properties}, {len(contents)} thoughts.")
 
         # Add the source first
-        source = self.add_source(keys=source_keys, properties=source_properties)
+        source = self.add_source(keys=source_keys, properties=source_properties, contents=source_contents)
         source_ids = [source[0]]
 
         # Generate embeddings for all contents at once (more efficient potentially)
@@ -183,7 +188,7 @@ class ThoughtsService:
                 embed = embeddings[index]
                 thought = self.add_thought(
                     content=content, 
-                    source_ids=[source.source_id], 
+                    source_ids=source_ids, 
                     embedding=embed
                 )
                 thought_ids.append(thought.thought_id)
@@ -199,13 +204,6 @@ class ThoughtsService:
             not parent_source_id or not child_source_id):
              raise ValueError(f"Source IDs not valid: {parent_source_id}, {child_source_id}")
         
-        # Optional: Verify both sources exist in DB first
-        parent_exists = self.session.get(Sources, parent_source_id)
-        child_exists = self.session.get(Sources, child_source_id)
-        if not parent_exists or not child_exists:
-            logger.error(f"Cannot link sources: Parent ({parent_source_id}) or Child ({child_source_id}) not found in DB.")
-            raise ValueError("Parent or Child source does not exist.")
-
         logger.info(f"Linking source {parent_source_id} --CONTAINS-> source {child_source_id}")
         cypher_query = f"""
         MATCH (parent:Source {{pg_table_id: {parent_source_id}}})

@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     DSPY_CACHE: bool = True # Turn DSPy cache on or off
     DSPY_CACHEDIR: str = "/tmp/dspy"
 
+    # S3
+    S3_ENDPOINT_URL: str = "http://minio:19000"
+    S3_ACCESS_KEY: str
+    S3_SECRET_KEY: str
+
     # Experimental parameters
     DUPLICATE_EMBEDDING_DISTANCE_MAX: float = 0.05 # Consider duplicate if embedding cosine distance below
 
@@ -72,3 +77,7 @@ logging.basicConfig(
 
 # --- Configure Other Loggers ---
 logging.getLogger('LiteLLM').setLevel(getattr(logging, settings.LOG_LEVEL_LiteLLM))
+# Components that rarely need enable debug
+logger_list = ['botocore', 'httpcore', 'urllib3']
+for _logger in logger_list:
+    logging.getLogger(_logger).setLevel(getattr(logging, 'INFO'))
