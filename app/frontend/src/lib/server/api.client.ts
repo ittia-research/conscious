@@ -108,7 +108,7 @@ async function getConfigsSources() {
 		console.error('Error in findThoughts:', error);
 		throw error;
 	}
-}  
+}
 
 // --- Fetch Configs Once on Server Start ---
 console.log('Server module initializing: fetching source configurations...');

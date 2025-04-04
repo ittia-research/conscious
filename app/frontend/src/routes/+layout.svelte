@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '../app.css';
+	import { projectName } from '$lib';
   
 	const githubRepoUrl: string = 'https://github.com/ittia-research/conscious';
 </script>
@@ -10,7 +11,7 @@
 	  <div class="container mx-auto px-4 py-3 flex justify-between items-center">
 		<!-- Logo/Brand (Optional) -->
 		<a href="/" class="text-xl font-bold hover:text-blue-200 transition duration-200">
-		  Project Conscious
+		  {projectName}
 		</a>
   
 		<!-- Navigation Links -->
@@ -45,6 +46,6 @@
 	</main>
   
 	<footer class="bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-center p-4 mt-auto">
-	  © {new Date().getFullYear()} ITTIA
+	  {projectName}
 	</footer>
 </div>
