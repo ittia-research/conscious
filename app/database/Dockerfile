@@ -83,7 +83,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     build-essential \
     cmake \
     libssl-dev \
-    postgresql-server-dev-17 \
+    postgresql-server-dev-${PG_MAJOR} \
     git ca-certificates
 
 RUN git clone --branch 2.19.1 --depth 1 https://github.com/timescale/timescaledb /tmp/timescaledb
