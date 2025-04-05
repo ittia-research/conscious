@@ -1,11 +1,10 @@
 # FastAPI backend for production
 
-FROM python:3.11-slim-bookworm
+FROM python:3.11-alpine
 
 # Install requirements
 COPY requirements.txt /tmp/
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
-RUN rm /tmp/requirements.txt
 
 WORKDIR /app
 
