@@ -9,3 +9,6 @@
 ## Major
 - [ ] A CLI tool that can interact with project APIs and do tasks more efficiently.
 - [ ] Exchanges between nodes.
+
+## Enhancement
+- [ ] Database tuning

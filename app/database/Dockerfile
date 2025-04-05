@@ -7,10 +7,12 @@
 
 
 ARG PG_MAJOR=17
+# Lock minor version for better stability
+ARG PG_MINOR=4
 
 
 # Build: AGE
-FROM postgres:${PG_MAJOR}-bookworm AS build_age
+FROM postgres:${PG_MAJOR}.${PG_MINOR}-bookworm AS build_age
 ARG PG_MAJOR
 
 RUN apt-get update \
@@ -31,7 +33,7 @@ RUN make && make install
 
 
 # Build: pgvectorscale
-FROM postgres:${PG_MAJOR}-bookworm AS build_vector
+FROM postgres:${PG_MAJOR}.${PG_MINOR}-bookworm AS build_vector
 ARG PG_MAJOR
 
 RUN apt update \
@@ -64,7 +66,7 @@ RUN cd /tmp \
 
 
 # Final stage
-FROM postgres:${PG_MAJOR}-bookworm
+FROM postgres:${PG_MAJOR}.${PG_MINOR}-bookworm
 ARG PG_MAJOR
 
 # Copy from AGE build
