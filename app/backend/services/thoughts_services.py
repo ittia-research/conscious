@@ -47,7 +47,8 @@ class ThoughtsService:
             if contents:
                 content_link = upload_texts_to_s3(contents, bucket_name='sources')
                 content_link = [i for i in content_link if i] # Remove empty ones if any
-            properties['contents'] = content_link
+            if content_link: # Avoid add empty properties
+                properties['contents'] = content_link
 
             # Build the SET clauses
             set_clauses = ["v.created_at = timestamp()"]
