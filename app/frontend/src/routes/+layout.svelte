@@ -35,6 +35,15 @@
 					<ul class="flex space-x-4 md:space-x-5">
 						<li>
 							<a
+								href="/review"
+								class="px-3 py-1 rounded-md text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white transition-all duration-150 ease-in-out"
+								aria-current={$page.url.pathname.startsWith('/review') ? 'page' : undefined}
+							>
+								Review
+							</a>
+						</li>
+						<li>
+							<a
 								href="/api"
 								class="px-3 py-1 rounded-md text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white transition-all duration-150 ease-in-out"
 								aria-current={$page.url.pathname.startsWith('/api') ? 'page' : undefined}
@@ -71,7 +80,7 @@
 	<!-- Footer -->
 	<footer class="bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 mt-auto">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-sm">
-             © {currentYear} {projectName}. All rights reserved.
+             © {currentYear} {projectName}
         </div>
 	</footer>
 

@@ -1,6 +1,6 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { findThoughts, getConfigsSources } from '$lib/server/api.client';
+import { findThoughts, getConfigsSources } from '$lib/server/apiClient';
 import type { ApiError, IdentifierValues } from '$lib/types';
 
 // Runs on the server before the page component is rendered

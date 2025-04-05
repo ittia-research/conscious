@@ -15,3 +15,16 @@ export interface ApiError {
 
 export type IdentifierValues = { [key: string]: string };
  
+export interface ReviewDiscardApiResponse {
+  message: string
+  id: number
+}
+
+export interface ReviewCardResponse {
+  thought_id: number;
+  text: string;
+}
+
+export interface ReviewGradeSubmission {
+  grade: number;
+}

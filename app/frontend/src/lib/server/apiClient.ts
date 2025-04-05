@@ -1,5 +1,8 @@
 import { env } from '$env/dynamic/private';
-import type { ConfigsApiResponse, FindApiResponse, ApiError, IdentifierValues } from '$lib/types';
+import type { ConfigsApiResponse, FindApiResponse, 
+    ApiError, IdentifierValues, ReviewDiscardApiResponse,
+    ReviewCardResponse, ReviewGradeSubmission
+ } from '$lib/types';
 
 // --- Helper for making authenticated requests ---
 interface RequestOptions extends Omit<RequestInit, 'body'> {
@@ -130,4 +133,54 @@ export async function getConfigsSources(): Promise<ConfigsType> {
     })();
 
     return fetchPromise;
+}
+
+
+// -- Discard a card --
+export async function discardCard(thoughtId: number): Promise<any> {
+    try {
+		const response = await makeApiRequest<ReviewDiscardApiResponse>({
+			endpoint: `/v1/review/${thoughtId}/discard`,
+			method: 'POST'
+		});
+        return response;
+    } catch (error) {
+        console.error("Error discarding card:", error);
+        throw error;
+    }
+}
+
+
+// -- Get next card --
+export async function getNextReviewCard(): Promise<ReviewCardResponse | null> {
+    try {
+		const response = await makeApiRequest<ReviewCardResponse>({
+			endpoint: `/v1/review/next`,
+			method: 'GET'
+		});
+
+        console.log(response)
+        // TO-DO: handle of different errors
+        return response as ReviewCardResponse | null;
+    } catch (error) {
+        console.error("Error fetching next card:", error);
+        throw error;
+    }
+}
+
+
+// -- Card review --
+export async function submitReviewGrade(thoughtId: number, grade: number): Promise<any> {
+    const submission: ReviewGradeSubmission = { grade };
+    try {
+		const response = await makeApiRequest<any>({
+			endpoint: `/v1/review/${thoughtId}/submit`,
+			method: 'POST',
+			body: submission
+		});
+        return response;
+    } catch (error) {
+        console.error("Error submitting grade:", error);
+        throw error;
+    }
 }
