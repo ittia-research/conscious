@@ -90,12 +90,12 @@ RUN git clone --branch 2.19.1 --depth 1 https://github.com/timescale/timescaledb
 
 WORKDIR /tmp/timescaledb
 
-# Build OSS only
+# For OSS build, add
+# `-DAPACHE_ONLY=1`, `rm -f $(pg_config --pkglibdir)/timescaledb-tsl-*.so`
 RUN ./bootstrap -DCMAKE_BUILD_TYPE=RelWithDebInfo -DREGRESS_CHECKS=OFF -DTAP_CHECKS=OFF \
-    -DPROJECT_INSTALL_METHOD="docker" -DAPACHE_ONLY=1
+    -DPROJECT_INSTALL_METHOD="docker" 
 RUN cd ./build \
-    && make install \
-    && rm -f $(pg_config --pkglibdir)/timescaledb-tsl-*.so
+    && make install
 
 
 # =================================================================
