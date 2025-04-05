@@ -4,6 +4,7 @@
 # Reference: 
 #   - https://github.com/apache/age/blob/43dcfa57f19a689ef696fad7d3d9b88401f7b2eb/docker/Dockerfile
 #   - https://github.com/timescale/pgvectorscale/blob/main/DEVELOPMENT.md
+#   - https://github.com/timescale/timescaledb-docker/blob/d74f32024d6af930ad95a71f3e6d717aa75b80bd/Dockerfile
 
 
 ARG PG_MAJOR=17
@@ -11,7 +12,10 @@ ARG PG_MAJOR=17
 ARG PG_MINOR=4
 
 
-# Build: AGE
+# =================================================================
+# ==                          Build AGE                          ==
+# =================================================================
+
 FROM postgres:${PG_MAJOR}.${PG_MINOR}-bookworm AS build_age
 ARG PG_MAJOR
 
@@ -32,7 +36,10 @@ RUN git checkout 43dcfa57f19a689ef696fad7d3d9b88401f7b2eb
 RUN make && make install
 
 
-# Build: pgvectorscale
+# =================================================================
+# ==                     Build pgvectorscale                     ==
+# =================================================================
+
 FROM postgres:${PG_MAJOR}.${PG_MINOR}-bookworm AS build_vector
 ARG PG_MAJOR
 
@@ -65,7 +72,36 @@ RUN cd /tmp \
     && make
 
 
-# Final stage
+# =================================================================
+# ==                      Build TimescaleDB                      ==
+# =================================================================
+
+FROM postgres:${PG_MAJOR}.${PG_MINOR}-bookworm AS build_timescaledb
+ARG PG_MAJOR
+
+RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
+    build-essential \
+    cmake \
+    libssl-dev \
+    postgresql-server-dev-17 \
+    git ca-certificates
+
+RUN git clone --branch 2.19.1 --depth 1 https://github.com/timescale/timescaledb /tmp/timescaledb
+
+WORKDIR /tmp/timescaledb
+
+# Build OSS only
+RUN ./bootstrap -DCMAKE_BUILD_TYPE=RelWithDebInfo -DREGRESS_CHECKS=OFF -DTAP_CHECKS=OFF \
+    -DPROJECT_INSTALL_METHOD="docker" -DAPACHE_ONLY=1
+RUN cd ./build \
+    && make install \
+    && rm -f $(pg_config --pkglibdir)/timescaledb-tsl-*.so
+
+
+# =================================================================
+# ==                         Final Stage                         ==
+# =================================================================
+
 FROM postgres:${PG_MAJOR}.${PG_MINOR}-bookworm
 ARG PG_MAJOR
 
@@ -84,7 +120,12 @@ COPY --from=build_vector /tmp/pgvectorscale/target/release/vectorscale-pg${PG_MA
 COPY --from=build_vector /tmp/pgvectorscale/target/release/vectorscale-pg${PG_MAJOR}/usr/share/postgresql/${PG_MAJOR}/extension/vectorscale--*.sql /usr/share/postgresql/$PG_MAJOR/extension/
 COPY --from=build_vector /tmp/pgvectorscale/target/release/vectorscale-pg${PG_MAJOR}/usr/share/postgresql/${PG_MAJOR}/extension/vectorscale.control /usr/share/postgresql/$PG_MAJOR/extension/
 
+# Copy from timescaledb build
+COPY --from=build_timescaledb /usr/lib/postgresql/$PG_MAJOR/lib/timescaledb*.so /usr/lib/postgresql/$PG_MAJOR/lib/
+COPY --from=build_timescaledb /usr/share/postgresql/$PG_MAJOR/extension/timescaledb--*.sql /usr/share/postgresql/$PG_MAJOR/extension/
+COPY --from=build_timescaledb /usr/share/postgresql/$PG_MAJOR/extension/timescaledb.control /usr/share/postgresql/$PG_MAJOR/extension/
+
 # Copy database initialization scripts for this project
 COPY ./initdb.d /docker-entrypoint-initdb.d
 
-CMD ["postgres", "-c", "shared_preload_libraries=age"]
+CMD ["postgres", "-c", "shared_preload_libraries=age,timescaledb"]
