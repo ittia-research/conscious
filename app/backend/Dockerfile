@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir grpcio-tools
 
 # Copy requirements file
-COPY requirements.txt .
+COPY backend/requirements.txt .
 
 # Install Python dependencies (without grpcio-tools if not needed at runtime)
 # Using virtualenv within the stage to isolate dependencies
@@ -23,7 +23,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy protobuf definitions
-COPY protos /app/protos
+COPY backend/protos /app/protos
 
 # Create output directory for generated code
 RUN mkdir /app/generated
@@ -57,7 +57,7 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /app/generated /app/generated
 
 # Copy application code (excluding protos, requirements.txt etc. already handled)
-COPY . /app
+COPY backend /app
 
 # Ensure scripts are executable if needed (e.g., entrypoint scripts)
 # RUN chmod +x /app/entrypoint.sh

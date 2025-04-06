@@ -126,6 +126,6 @@ COPY --from=build_timescaledb /usr/share/postgresql/$PG_MAJOR/extension/timescal
 COPY --from=build_timescaledb /usr/share/postgresql/$PG_MAJOR/extension/timescaledb.control /usr/share/postgresql/$PG_MAJOR/extension/
 
 # Copy database initialization scripts for this project
-COPY ./initdb.d /docker-entrypoint-initdb.d
+COPY database/initdb.d /docker-entrypoint-initdb.d
 
 CMD ["postgres", "-c", "shared_preload_libraries=age,timescaledb"]
