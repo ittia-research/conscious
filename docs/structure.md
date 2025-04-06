@@ -1,5 +1,20 @@
 Implementations and thinking about structure of this project.
 
+## Tech Stack
+- database:
+  - PostgreSQL, with extensions:
+    - Apache AGE
+    - pgvector, pgvectorscale
+    - TimescaleDB (including TSL licensed parts)
+- backend: FastAPI
+- frontend:
+  - SvelteKit
+  - TypeScript
+  - TailWind CSS
+- infrastructure:
+  - nginx
+  - infinity
+
 ## Data
 ### Rules
 General:
