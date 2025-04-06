@@ -49,3 +49,6 @@ test-reports
 *.env
 .env*
 secrets
+
+# Docs
+*.md

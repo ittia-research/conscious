@@ -1,15 +1,17 @@
 # FastAPI backend for production
 
-FROM python:3.11-alpine
-
-# Install requirements
-COPY requirements.txt /tmp/
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
-# Copy application files
-COPY . .
+# Install dependencies
+COPY requirements.txt /tmp
+RUN cd /tmp \
+    && pip install --no-cache-dir -r requirements.txt \
+    && rm -f requirements.txt
+
+# Copy app files and ensure ownership is set to the non-root user
+COPY . /app
 
 EXPOSE 8000
 
