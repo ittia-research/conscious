@@ -3,14 +3,12 @@ Next step to be super human.
 Explore interfaces between AI and human.
 
 ## Latest Status
-Basic structure built:
+This project is experimental/research only at this moment.
+
+Main features::
 - Find thoughts from text via basic LLM inference.
-- Store all data into PostgreSQL:
-  - Thoughts, sources -> PostgreSQL tables (relational database)
-  - embedding of thought text -> pgvector (vector database)
-  - Relationship between and within thoughts, sources -> Apache AGE (knowledge graph)
-- Basic backend API (FastAPI)
-- Basic web page to interact with backend API (SvelteKit)
+- Store different type of data in one PostgreSQL database: table, vector, graph, timeseries.
+- Web portal: using flashcard to interact with stored thoughts.
 
 ## Get Started
 [Online demo](https://conscious.ittia.net)
