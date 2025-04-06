@@ -1,5 +1,4 @@
 # app/utils/helpers.py
-import uuid
 import logging
 from typing import List, Any, Dict, Type, Optional
 from sqlalchemy import text

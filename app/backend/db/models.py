@@ -27,20 +27,6 @@ class Thoughts(Base):
     srs_last_review = Column(DateTime(timezone=True))
     srs_discard = Column(Boolean)
 
-    # @property
-    # def srs_state(self) -> FSRSState:
-    #     """Gets the state as a FSRSState enum member."""
-    #     if self._srs_state is None: # srs_state could be Null
-    #         return self._srs_state
-    #     return FSRSState(self._srs_state)
-
-    # @srs_state.setter
-    # def srs_state(self, value: FSRSState):
-    #     """Sets the state using a TaskStatus enum member."""
-    #     if not isinstance(value, FSRSState):
-    #         raise TypeError(f"Expected TaskStatus enum member, got {type(value)}")
-    #     self._srs_state = value.value # Store the integer value
-
     def __repr__(self):
         _limit = 50
         preview = self.text[:_limit] + "..." if len(self.text) > _limit else self.text
@@ -52,8 +38,6 @@ class ReviewLogs(Base):
     TimescaleDB table for review logs.
     """
     __tablename__ = 'review_logs'
-
-    # log_id = Column(Integer, primary_key=True) # TO-DO: remove this one
 
     time = Column(TIMESTAMP(timezone=True), nullable=False)
     thought_id = Column(Integer, nullable=False)
