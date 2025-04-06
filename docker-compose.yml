@@ -23,7 +23,7 @@ services:
       - prod_network
     restart: unless-stopped
 
-  # FastAPI Backend Production
+  # gRPC Backend Production
   prod-backend:
     image: ghcr.io/ittia-research/conscious:latest-backend
     # build:
@@ -116,7 +116,7 @@ services:
       - dev_network
     restart: no
 
-  # FastAPI Backend Development
+  # gRPC Backend Development
   dev-backend:
     build:
       context: ./app/backend
@@ -129,14 +129,14 @@ services:
       - ./infra/env.d/s3
       - ./infra/env.d/.private
     volumes:
-      - ./app/backend:/app
+      # - ./app/backend:/app
       - .data/cache/dspy:/cache/dspy
     ports:
-      - "8000:8000"
-    command: /bin/sh -c "
-        cd /app
-        && uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-      " # Add --reload for development
+      - "50051:50051"
+    # command: /bin/sh -c "
+    #     cd /app
+    #     && uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    #   " # Add --reload for development
     depends_on:
       - dev-database
       - minio
@@ -147,10 +147,14 @@ services:
 
   # SvelteKit Frontend Development
   dev-frontend:
-    # Use Debian for development
-    image: node:23-bookworm-slim
+    build:
+      context: ./app
+      dockerfile: frontend/Dockerfile
+    user: "0" # Run as root user to install packages and manage files
     ports:
       - "3000:3000"
+    environment:
+      - NODE_ENV=development # Overwrite the production env set in docker image
     env_file:
       - ./infra/env.d/dev
       - ./infra/env.d/backend
@@ -160,11 +164,8 @@ services:
       # Mount local code to reload automatically during development,
       # and save installation files to local
       - ./app/frontend:/app
-    command: /bin/sh -c "
-        cd /app
-        && npm install
-        && npm run dev -- --host --port 3000
-      "
+      - ./app/backend/protos:/app/src/protos
+    command: /bin/sh -c /app/scripts/setup_dev.sh
     depends_on:
       - dev-backend
     profiles: ["dev"]

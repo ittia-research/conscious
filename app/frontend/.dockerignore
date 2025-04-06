@@ -32,3 +32,6 @@ yarn-error.log*
 
 # Documents
 *.md
+
+# Generated protobuf code
+generated

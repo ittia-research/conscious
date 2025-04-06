@@ -1,5 +1,7 @@
 # SvelteKit frontend for production
 
+# Build from context of `./app` instead of `./app/frontend` to use the shared protos folder
+
 ARG NODE_MAJOR=23
 
 
@@ -8,21 +10,39 @@ FROM node:${NODE_MAJOR}-alpine AS builder
 
 WORKDIR /app
 
+# Install protobuf compiler and development headers for generate TypeScript proto
+RUN apk add --no-cache protoc protobuf-dev
+
 # Copy package manifests
-COPY package.json package-lock.json* ./
+COPY frontend/package.json frontend/package-lock.json* ./
 
 # Install all dependencies (including devDependencies needed for build)
 # Using 'ci' ensures a clean, reproducible install based on lockfile
 RUN npm ci
 
 # Copy the rest of the application source code
-COPY . .
+COPY frontend .
+
+# Generate TypeScript proto files before build
+COPY backend/protos src/protos
+RUN mkdir -p ./src/lib/server/grpc/generated \
+    && protoc \
+    --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto \
+    --ts_proto_out=./src/lib/server/grpc/generated \
+    --ts_proto_opt=env=node,outputServices=grpc-js,useExactTypes=false \
+    -I/usr/include \
+    -I./src/protos \
+    ./src/protos/conscious_api.proto 
+
+# For env check during build
+# TO-DO: better solution
+ENV BACKEND_API_BASE="localhost:50051"
+ENV BACKEND_API_KEY="PLACE_HOLDER"
 
 # Generates the production-ready code (usually in /app/build)
 RUN npm run build
 
-# Optional: Prune development dependencies after build to reduce node_modules size
-# This step removes packages listed in devDependencies from node_modules
+# Prune development dependencies after build to reduce node_modules size
 RUN npm prune --omit=dev
 
 

@@ -14,8 +14,8 @@
 
     // Example: Determine if a link is active (can be expanded)
     // $: isApiActive = $page.url.pathname.startsWith('/api');
-</script>
-
+</script> 
+ 
 <!-- Base layout container -->
 <div class="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 selection:bg-indigo-100 selection:text-indigo-900">
 
@@ -40,15 +40,6 @@
 								aria-current={$page.url.pathname.startsWith('/review') ? 'page' : undefined}
 							>
 								Review
-							</a>
-						</li>
-						<li>
-							<a
-								href="/api"
-								class="px-3 py-1 rounded-md text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white transition-all duration-150 ease-in-out"
-								aria-current={$page.url.pathname.startsWith('/api') ? 'page' : undefined}
-							>
-								API
 							</a>
 						</li>
 						<li>

@@ -1,2 +1,2 @@
 POSTGRES_HOST="dev-database"
-BACKEND_API_BASE="http://dev-backend:8000"
+BACKEND_API_BASE="dev-backend:50051"

@@ -14,7 +14,8 @@ export interface ApiError {
 }
 
 export type IdentifierValues = { [key: string]: string };
- 
+export type ConfigsType = { [key: string]: any };
+
 export interface ReviewDiscardApiResponse {
   message: string
   id: number

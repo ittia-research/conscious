@@ -1,2 +1,2 @@
 POSTGRES_HOST="prod-database"
-BACKEND_API_BASE="http://prod-backend:8000"
+BACKEND_API_BASE="prod-backend:50051"
