@@ -1,7 +1,7 @@
+// src/hooks.server.ts
 import type { Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 
-// src/hooks.server.ts
 import { createContext } from '$lib/server/trpc/context';
 import { router } from '$lib/server/trpc/router';
 // Use the WebSocket handler from trpc-sveltekit

@@ -61,7 +61,7 @@ const useTls = GRPC_SERVER_ADDRESS.startsWith('grpcs://');
 const resolvedGrpcAddress = GRPC_SERVER_ADDRESS.replace(/^grpcs?:\/\//, '');
 
 // REFINEMENT: Centralize proto path resolution.
-const protoBasePath = path.resolve(process.cwd(), 'src/protos');
+const protoBasePath = path.resolve(process.cwd(), 'src/lib/server/grpc/protos');
 const mainProtoPath = path.join(protoBasePath, 'conscious_api.proto');
 // REFINEMENT: Explicitly include directory for potential google protobuf imports if needed
 const includeDirs = [protoBasePath, path.resolve(process.cwd(), 'node_modules/@grpc/proto-loader/build/proto_assets')]; // Adjust second path if needed

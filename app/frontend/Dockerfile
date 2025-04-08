@@ -24,17 +24,16 @@ RUN npm ci
 COPY frontend .
 
 # Generate TypeScript proto files before build
-COPY backend/protos src/protos
+COPY backend/protos src/lib/server/grpc/protos
 RUN mkdir -p ./src/lib/server/grpc/generated \
     && protoc \
     --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto \
     --ts_proto_out=./src/lib/server/grpc/generated \
     --ts_proto_opt=env=node,outputServices=grpc-js,useExactTypes=false \
     -I/usr/include \
-    -I./src/protos \
-    -I./src/lib/server/protos \
-    ./src/protos/conscious_api.proto \
-    ./src/lib/server/protos/gateway.proto 
+    -I./src/lib/server/grpc/protos \
+    ./src/lib/server/grpc/protos/conscious_api.proto \
+    ./src/lib/server/grpc/protos/speak_gateway.proto 
 
 # For env check during build
 # TO-DO: better solution
@@ -61,6 +60,7 @@ ENV NODE_ENV=production
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/src/lib/server/grpc /app/src/lib/server/grpc
 
 EXPOSE 3000
 

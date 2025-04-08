@@ -6,10 +6,10 @@ import path from 'path';
 
 // --- Configuration ---
 const GATEWAY_ADDRESS = env.SPEAK_GRPC_ADDRESS || 'localhost:30051';
-const protoBasePath = path.resolve(process.cwd(), 'src/lib/server/protos');
-const PROTO_PATH = path.join(protoBasePath, 'gateway.proto');
+const protoBasePath = path.resolve(process.cwd(), 'src/lib/server/grpc/protos');
+const PROTO_PATH = path.join(protoBasePath, 'speak_gateway.proto');
 
-// Define types based on gateway.proto
+// Define types based on the gateway proto
 // We'll use the string representation for the enum when sending
 interface SynthesizeRequest {
     target_text: string;

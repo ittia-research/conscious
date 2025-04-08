@@ -8,7 +8,8 @@ This project is experimental/research only at this moment.
 Main features::
 - Find thoughts from text via basic LLM inference.
 - Store different type of data in one PostgreSQL database: table, vector, graph, timeseries.
-- Web portal: using flashcard to interact with stored thoughts.
+- Flashcard web portal to interact with stored thoughts:
+  - Multi-speaker audio play via the the [Speak](https://github.com/ittia-research/speak) TTS server.
 
 ## Get Started
 [Online demo](https://conscious.ittia.net)
