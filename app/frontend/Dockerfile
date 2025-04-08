@@ -32,7 +32,9 @@ RUN mkdir -p ./src/lib/server/grpc/generated \
     --ts_proto_opt=env=node,outputServices=grpc-js,useExactTypes=false \
     -I/usr/include \
     -I./src/protos \
-    ./src/protos/conscious_api.proto 
+    -I./src/lib/server/protos \
+    ./src/protos/conscious_api.proto \
+    ./src/lib/server/protos/gateway.proto 
 
 # For env check during build
 # TO-DO: better solution

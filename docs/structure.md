@@ -6,7 +6,7 @@ Implementations and thinking about structure of this project.
     - Apache AGE
     - pgvector, pgvectorscale
     - TimescaleDB (including TSL licensed parts)
-- backend: FastAPI
+- backend: gRPC Python
 - frontend:
   - SvelteKit
   - TypeScript

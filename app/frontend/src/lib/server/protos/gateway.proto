@@ -1,0 +1,31 @@
+// protos/gateway.proto
+syntax = "proto3";
+
+package gateway;
+
+// Enum defining the possible output audio formats
+enum OutputFormat {
+  // Default format, raw PCM Float32 bytes (effectively WAV data without headers)
+  OUTPUT_FORMAT_UNSPECIFIED = 0; // Implicitly defaults to WAV_PCM_FLOAT32
+  OUTPUT_FORMAT_WAV_PCM_FLOAT32 = 1; // Explicitly request raw PCM Float32
+  // Opus codec in WebM container, variable bitrate optimized for voice
+  OUTPUT_FORMAT_OPUS_WEBM = 2;
+}
+
+// Service definition for the TTS Gateway
+service AudioGateway {
+  // Takes text, streams back audio chunks using a randomly selected template
+  rpc SynthesizeSpeech (SynthesizeRequest) returns (stream AudioChunk) {}
+}
+
+// Request message containing the text to synthesize
+message SynthesizeRequest {
+  string target_text = 1;
+  // Client can specify the desired output format. Defaults to WAV_PCM_FLOAT32 if unset.
+  OutputFormat output_format = 2;
+}
+
+// Response message containing a chunk of audio data
+message AudioChunk {
+  bytes audio_data = 1; // Raw audio bytes (format depends on request)
+}

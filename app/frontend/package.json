@@ -11,6 +11,7 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
+		"start": "node ./wsServer.js",
 		"lint": "prettier --check ."
 	},
 	"devDependencies": {
@@ -33,6 +34,12 @@
 	"dependencies": {
 		"@grpc/grpc-js": "^1.13.2",
 		"@grpc/proto-loader": "^0.7.13",
-		"google-protobuf": "^3.21.4"
+		"@trpc/client": "^10.45.2",
+		"@trpc/server": "^10.45.2",
+		"@types/ws": "^8.18.1",
+		"google-protobuf": "^3.21.4",
+		"trpc-sveltekit": "^3.6.3",
+		"ws": "^8.18.1",
+		"zod": "^3.24.2"
 	}
 }

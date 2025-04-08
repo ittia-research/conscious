@@ -5,7 +5,13 @@
 
 ## Major
 - [ ] A CLI tool that can interact with project APIs and do tasks more efficiently.
-- [ ] Exchanges between nodes.
+- [ ] Use case: language learning, supports different methods.
+- [ ] Exchanges between isolated memory.
+
+## Features
+### Interactive
+Output:
+ - [ ] TTS
 
 ## Enhancement
 - [ ] Database tuning
@@ -13,5 +19,5 @@
 ## Details
 - [ ] Database input sanitization, and keys of properties should not contain `keys`.
 
-Security:
+## Security
 - [ ] Dockerfile security follow the best practices.

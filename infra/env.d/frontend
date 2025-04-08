@@ -1,0 +1,2 @@
+# gRPC address of the Speak server
+SPEAK_GRPC_ADDRESS=localhost:30051
