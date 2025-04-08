@@ -11,7 +11,7 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
-		"start": "node ./wsServer.js",
+		"start": "node ./wsServer",
 		"lint": "prettier --check ."
 	},
 	"devDependencies": {

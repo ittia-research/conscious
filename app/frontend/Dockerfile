@@ -60,13 +60,17 @@ ENV NODE_ENV=production
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/node_modules ./node_modules
+
+# TO-DO: why this is needed
 COPY --from=builder /app/src/lib/server/grpc /app/src/lib/server/grpc
+
+# Copy the tRPC entrypoint
+COPY --from=builder /app/wsServer.js ./wsServer.js
 
 EXPOSE 3000
 
-# adapter-node typically creates an entry point at build/index.js
-# Running 'node build' executes this entry point.
-CMD ["node", "build"]
+# Using the tRPC entrypoint instead of `build/index.js`
+CMD ["node", "./wsServer.js"]
 
 # Set user for security (better than running as root)
 USER node
