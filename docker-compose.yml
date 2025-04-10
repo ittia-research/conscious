@@ -164,8 +164,9 @@ services:
       # Mount local code to reload automatically during development,
       # and save installation files to local
       - ./app/frontend:/app
-      - ./app/backend/protos:/app/src/protos
-    command: /bin/sh -c /app/scripts/setup_dev.sh
+      - ./app/backend/protos:/data/protos
+      - ./app/frontend/dev.sh:/app/dev.sh
+    command: /bin/sh -c /app/dev.sh
     depends_on:
       - dev-backend
     profiles: ["dev"]

@@ -13,15 +13,16 @@ npm ci
 
 # Generate TypeScript proto files before build
 # Remove existing first
-rm -rf ./src/lib/server/grpc/generated
-mkdir -p ./src/lib/server/grpc/generated
+find ./src/lib/server/grpc/generated -type f -delete
+
 protoc \
     --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto \
     --ts_proto_out=./src/lib/server/grpc/generated \
     --ts_proto_opt=env=node,outputServices=grpc-js,useExactTypes=false \
     -I/usr/include \
-    -I./src/protos \
-    ./src/lib/server/grpc/protos/conscious_api.proto \
+    -I/data/protos \
+    -I./src/lib/server/grpc/protos \
+    /data/protos/conscious_api.proto \
     ./src/lib/server/grpc/protos/speak_gateway.proto
 
 # Start dev server

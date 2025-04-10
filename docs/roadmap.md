@@ -2,6 +2,7 @@
 - [ ] Support storage of raw source data instead of just derived thoughts.
 - [ ] Sync to human memory. Methods to consider: flashcard, thoughts map.
 - [ ] Scheduled tasks to update relationships in database.
+- [ ] Define tasks.
 
 ## Major
 - [ ] A CLI tool that can interact with project APIs and do tasks more efficiently.
@@ -12,6 +13,9 @@
 ### Interactive
 Output:
  - [ ] TTS
+
+### Tasks
+- [ ] Import and engage with book highlights.
 
 ## Enhancement
 - [ ] Database tuning
