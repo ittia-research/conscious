@@ -48,7 +48,7 @@ import type {
 // --- Configuration ---
 const GRPC_SERVER_ADDRESS = env.BACKEND_API_BASE; // e.g., "localhost:50051" or "grpcs://api.example.com"
 const API_KEY = env.BACKEND_API_KEY;
-const GRPC_CALL_TIMEOUT_MS = parseInt(env.GRPC_CALL_TIMEOUT_MS || '5000', 10); // Default 5 seconds
+const GRPC_CALL_TIMEOUT_MS = parseInt(env.GRPC_CALL_TIMEOUT_MS || '10000', 10); // Default 5 seconds
 const CONFIG_CACHE_TTL_MS = parseInt(env.CONFIG_CACHE_TTL_MS || '300000', 10); // Default 5 minutes
 
 if (!GRPC_SERVER_ADDRESS || !API_KEY) {
