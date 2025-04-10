@@ -25,9 +25,8 @@ class FindThoughtsSignature(dspy.Signature):
       desc=(
           "Generate a list of strings, each representing a distinct and primary main thought or core idea directly extracted from the input text. "
           "Focus only on the most significant concepts. "
-          "Each thought should be summarized concisely and be self-contained: include enough context (key subjects/concepts from the text) to be understood on its own. "
-          "To preserve meaning and clarity, incorporate key terminology or impactful phrasing directly from the source text where appropriate without quote. "
-          "Exclude secondary details, examples, or vague statements."
+          "Each one should be self-contained: include enough context (key subjects/concepts from the text) to be understood on its own. "
+          "To preserve meaning and clarity, incorporate key terminology or impactful phrasing directly from the source text where appropriate. "
       )
   )
 
