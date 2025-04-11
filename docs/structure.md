@@ -29,6 +29,8 @@ thoughts (table)
 Thought (Knowledge Graph vertex)
 - contains thoughts table_id
 - used for establish relationships with sources, etc.
+- connections:
+  - Task name as type of the DERIVED_TO connection from Source to Thought.
 
 Sources (Knowledge Graph vertex)
 - contains:

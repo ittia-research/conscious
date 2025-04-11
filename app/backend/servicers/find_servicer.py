@@ -9,7 +9,7 @@ from generated import conscious_api_pb2
 from generated import conscious_api_pb2_grpc
 
 # Import business logic and utilities
-from services.find_thoughts import FindThoughts
+from modules.find_thoughts import FindThoughts
 from utils.validators import decode_unicode_escapes_logic
 
 # Import status types for richer errors

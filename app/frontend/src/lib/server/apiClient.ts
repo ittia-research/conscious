@@ -17,38 +17,37 @@ import type {
     FindServiceClient,
     ConfigServiceClient,
     ReviewServiceClient,
+    DataServiceClient,
     // HealthClient // Uncomment if you implement health checks
 } from './grpc/generated/conscious_api'; // Main service client interfaces
 import {
     FindThoughtsRequest,
     FindThoughtsResponse,
-    GetConfigsRequest,
     GetConfigsResponse,
     GetNextReviewCardResponse,
     SubmitReviewGradeRequest,
     ReviewUpdateResponse,
     DiscardThoughtRequest,
     DiscardThoughtResponse,
-    HealthCheckRequest,
-    HealthCheckResponse,
-    // google_rpc_Status, // Import if you implement rich error detail parsing
 } from './grpc/generated/conscious_api'; // Message types
 import type { Struct } from './grpc/generated/google/protobuf/struct';
 import type { Timestamp } from './grpc/generated/google/protobuf/timestamp';
-// import { Value } from './grpc/generated/google/protobuf/struct'; // May be needed for advanced structToObject
 
 // --- Custom SvelteKit Types ---
 import type {
     ConfigsType,
+    AllConfigsType,
     ApiError,
     IdentifierValues,
-    ReviewCardResponse as UIReviewCardResponse
+    ReviewCardResponse as UIReviewCardResponse,
+    AddDataRequest,
+    AddDataResponse
 } from '$lib/types';
 
 // --- Configuration ---
 const GRPC_SERVER_ADDRESS = env.BACKEND_API_BASE; // e.g., "localhost:50051" or "grpcs://api.example.com"
 const API_KEY = env.BACKEND_API_KEY;
-const GRPC_CALL_TIMEOUT_MS = parseInt(env.GRPC_CALL_TIMEOUT_MS || '10000', 10); // Default 5 seconds
+const GRPC_CALL_TIMEOUT_MS = parseInt(env.GRPC_CALL_TIMEOUT_MS || '20000', 10);
 const CONFIG_CACHE_TTL_MS = parseInt(env.CONFIG_CACHE_TTL_MS || '300000', 10); // Default 5 minutes
 
 if (!GRPC_SERVER_ADDRESS || !API_KEY) {
@@ -250,6 +249,7 @@ interface ServiceClients {
     find: FindServiceClient;
     config: ConfigServiceClient;
     review: ReviewServiceClient;
+    data: DataServiceClient;
     // health?: HealthClient; // Optional if implemented
     closeAll: () => void; // Add a function to close clients
 }
@@ -285,6 +285,8 @@ function getClients(): ServiceClients {
         resolvedGrpcAddress, credentials, channelOptions);
     const reviewGrpcClient = new (consciousPackage!.ReviewService as grpc.ServiceClientConstructor)(
         resolvedGrpcAddress, credentials, channelOptions);
+    const dataGrpcClient = new (consciousPackage.DataService as grpc.ServiceClientConstructor)(
+        resolvedGrpcAddress, credentials, channelOptions);
     // const healthGrpcClient = new ...
 
     // BEST PRACTICE: Provide a way to close clients for graceful shutdown
@@ -293,6 +295,7 @@ function getClients(): ServiceClients {
         findGrpcClient.close();
         configGrpcClient.close();
         reviewGrpcClient.close();
+        dataGrpcClient.close();
         // healthGrpcClient?.close();
         clients = null; // Allow re-creation if needed after close
         logger.info("gRPC clients closed.");
@@ -322,6 +325,9 @@ function getClients(): ServiceClients {
                 submitReviewGrade: promisifyClientMethod<SubmitReviewGradeRequest, ReviewUpdateResponse>(reviewGrpcClient.submitReviewGrade),
                 discardThought: promisifyClientMethod<DiscardThoughtRequest, DiscardThoughtResponse>(reviewGrpcClient.discardThought),
             } as ReviewServiceClient,
+            data: {
+                addData: promisifyClientMethod<AddDataRequest, AddDataResponse>(dataGrpcClient.addData),
+            } as DataServiceClient,
             // health: { ... },
             closeAll: closeAllClients,
         };
@@ -377,55 +383,68 @@ export async function findThoughts(text: string, type: string, identifiers: Iden
 }
 
 // == Get configs of sources with caching ==
-interface CachedConfig {
-    data: ConfigsType;
+interface CachedConfigs { 
+    data: AllConfigsType;
     timestamp: number;
 }
-let cachedConfigs: CachedConfig | null = null;
-let fetchPromise: Promise<ConfigsType> | null = null; // For preventing race conditions
 
-export async function getConfigsSources(): Promise<ConfigsType> {
-    const now = Date.now();
-    // Check cache validity (data exists and TTL hasn't expired)
-    if (cachedConfigs !== null && (now - cachedConfigs.timestamp < CONFIG_CACHE_TTL_MS)) {
-        logger.info('Returning cached configs');
-        return cachedConfigs.data;
-    }
+let cachedConfigs: CachedConfigs | null = null;
+let fetchPromise: Promise<AllConfigsType> | null = null; // For preventing race conditions
 
-    // If fetch is already in progress, wait for it
-    if (fetchPromise !== null) {
-        logger.info('Waiting for existing config fetch operation');
-        return fetchPromise;
-    }
+/**
+ * Fetches sources and tasks configurations from the gRPC endpoint.
+ * @returns {Promise<AllConfigsType>}
+ */
+export async function getConfigs(): Promise<AllConfigsType> {
+  const now = Date.now();
 
-    logger.info('Initiating gRPC config fetch (cache miss or expired)...');
-    fetchPromise = (async (): Promise<ConfigsType> => {
-        const client = getClients().config;
-        const metadata = createAuthMetadata();
-        // REFINEMENT: Use a potentially shorter timeout for config requests?
-        const options = createCallOptions(3000); // Example: 3 second timeout
-        const request: GetConfigsRequest = { config_type: 'sources' };
+  // Check cache validity (data exists and TTL hasn't expired)
+  if (cachedConfigs !== null && (now - cachedConfigs.timestamp < CONFIG_CACHE_TTL_MS)) {
+    logger.info('Returning cached configs (sources and tasks)');
+    return cachedConfigs.data;
+  }
 
-        try {
-            const response = await client.getConfigs(request, metadata, options);
-            // REFINEMENT: Default to empty object if conversion fails or response is empty
-            const configsObject = structToObject(response.configs) ?? {};
-
-            // Update cache
-            cachedConfigs = { data: configsObject, timestamp: Date.now() };
-            logger.info('gRPC Configs fetched and cached successfully.');
-            fetchPromise = null; // Clear the promise lock
-            return configsObject;
-        } catch (error: any) {
-            fetchPromise = null; // Clear the promise lock on error too
-            // Don't cache failures. Allow retry on next call.
-            cachedConfigs = null; // Invalidate cache on error
-            logger.error('Error fetching gRPC configs, cache invalidated.');
-            handleGrpcError(error, 'getConfigsSources');
-        }
-    })();
-
+  // If fetch is already in progress, wait for it
+  if (fetchPromise !== null) {
+    logger.info('Waiting for existing config fetch operation');
     return fetchPromise;
+  }
+
+  logger.info('Initiating gRPC config fetch (cache miss or expired)...');
+  fetchPromise = (async (): Promise<AllConfigsType> => {
+    const client = getClients().config;
+    const metadata = createAuthMetadata();
+    const options = createCallOptions(3000); // 3 second timeout
+
+    try {
+      // Note: Depending on gRPC client library (like protobuf-ts),
+      // might need to pass an empty object {} even for no-argument calls.
+      const response: GetConfigsResponse = await client.getConfigs({}, metadata, options);
+
+      // Default to empty object if conversion fails or field is missing/null
+      const sourcesObject = structToObject(response.sources) ?? {};
+      const tasksObject = structToObject(response.tasks) ?? {};
+
+      const combinedConfigs: AllConfigsType = {
+        sources: sourcesObject,
+        tasks: tasksObject,
+      };
+
+      // Update cache with the combined data
+      cachedConfigs = { data: combinedConfigs, timestamp: Date.now() };
+      logger.info('gRPC Configs (sources and tasks) fetched and cached successfully.');
+      fetchPromise = null; // Clear the promise lock
+      return combinedConfigs; // Return the combined object
+    } catch (error: any) {
+      fetchPromise = null; // Clear the promise lock on error too
+      // Don't cache failures. Allow retry on next call.
+      cachedConfigs = null; // Invalidate cache on error
+      logger.error('Error fetching gRPC configs, cache invalidated.');
+      handleGrpcError(error, 'getConfigs');
+    }
+  })();
+
+  return fetchPromise;
 }
 
 // -- Discard a card --
@@ -504,38 +523,63 @@ export async function submitReviewGrade(thoughtId: number, grade: number): Promi
     }
 }
 
-// --- Optional: Health Check ---
-// Uncomment and implement if your backend service supports gRPC Health Checking Protocol
-/*
-export async function checkBackendHealth(service: string = ""): Promise<HealthCheckResponse> {
-    const healthClient = getClients().health;
-    if (!healthClient) {
-        logger.warn("Health check requested, but HealthClient is not configured/implemented.");
-        // Return a dummy "UNKNOWN" status or throw an error
-         return { status: 'UNKNOWN' }; // Match HealthCheckResponse enum/string type
-        // OR throw new Error("Health client not available");
-    }
 
-    const metadata = createAuthMetadata(); // Health checks might not need auth? Check service requirements.
-    const options = createCallOptions(1000); // Use a short timeout for health checks
-    const request: HealthCheckRequest = { service }; // Empty string checks overall health
+// --- Add Data ---
+export async function addData(
+    task: string,
+    sourceType: string,
+    sourceIdentifiers: { [key: string]: string },
+    fileContentBytes: Uint8Array | undefined,
+    textList: string[]
+): Promise<AddDataResponse> { // Make sure AddDataResponse matches your generated type if using ts-proto
+    const client = getClients().data;
+    const metadata = createAuthMetadata();
+    // Consider a longer timeout for file uploads
+    const options = createCallOptions(30000); // 30 seconds example
+
+    const filteredTextList = textList.filter(text => text.trim() !== '');
+
+    // --- CORRECTED REQUEST OBJECT ---
+    // Keys MUST match the .proto field names exactly due to keepCase: true
+    const request = { // Type assertion like ': ProtoAddDataRequest' might be needed if using ts-proto types
+        task: task,
+        source_type: sourceType,           // Correct: snake_case
+        source_identifiers: sourceIdentifiers, // Correct: snake_case
+        file_content: fileContentBytes,      // Correct: snake_case
+        text_list: filteredTextList,         // Correct: snake_case
+    };
 
     try {
-        logger.info({ request }, 'Calling checkBackendHealth gRPC method');
-        const response = await healthClient.check(request, metadata, options);
-        logger.info({ service, status: response.status }, "Health Check Status:");
-        return response;
+        // Log using the correct field names as well for consistency
+        logger.info({ request: {
+            task: request.task,
+            source_type: request.source_type,
+            source_identifiers: request.source_identifiers,
+            filePresent: !!request.file_content,
+            fileSize: request.file_content?.length,
+            textListCount: request.text_list.length,
+        } }, 'Calling gRPC client.addData method with prepared request');
+
+        // The client.addData method expects an object matching the proto structure
+        const response = await client.addData(request, metadata, options);
+
+        // Assuming AddDataResponse is correctly generated/imported
+        return response as AddDataResponse;
+
     } catch (error: any) {
-        // Don't use handleGrpcError directly if you want specific health check failure handling
-        logger.error({ err: error, context: 'checkBackendHealth' }, `Health check failed for service: '${service}'`);
-         // Map specific gRPC errors (like UNAVAILABLE) to specific HealthCheckStatus enums
-         if (error.code === grpc.status.UNAVAILABLE) {
-            return { status: 'NOT_SERVING' }; // Or appropriate status from your enum
-         }
-         // Return a general failure status
-         return { status: 'UNKNOWN' }; // Or 'NOT_SERVING'
-        // Alternatively, re-throw using handleGrpcError if standard error handling is desired
-        // handleGrpcError(error, `checkBackendHealth(service=${service})`);
+        // Log the error *including* the request data (sans file) that caused it
+        logger.error({
+            error,
+            requestData: { // Use correct field names in logging context
+                task: request.task,
+                source_type: request.source_type,
+                source_identifiers: request.source_identifiers,
+                filePresent: !!request.file_content,
+                fileSize: request.file_content?.length,
+                textListCount: request.text_list.length
+            }
+        }, 'gRPC client.addData method failed');
+
+        handleGrpcError(error, 'addData');
     }
 }
-*/

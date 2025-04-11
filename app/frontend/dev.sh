@@ -25,5 +25,7 @@ protoc \
     /data/protos/conscious_api.proto \
     ./src/lib/server/grpc/protos/speak_gateway.proto
 
+npx svelte-kit sync
+
 # Start dev server
 npm run dev -- --host --port 3000

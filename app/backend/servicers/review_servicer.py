@@ -11,10 +11,10 @@ from typing import Optional
 from generated import conscious_api_pb2
 from generated import conscious_api_pb2_grpc
 
-# Import DB, models, and services
+# Import DB, models, and modules
 from db.session import get_db_session
 from db.models import Thoughts # Assuming ReviewLogs is used within review_card
-from services.fsrs_services import review_card # Assuming this exists and works
+from modules.fsrs_services import review_card # Assuming this exists and works
 
 logger = logging.getLogger(__name__)
 

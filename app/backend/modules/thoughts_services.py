@@ -11,6 +11,7 @@ from db.s3 import upload_texts_to_s3
 from utils.helpers import execute_cypher
 from utils.embeddings import get_embeddings
 from core.config import settings
+from enums import ThoughtType
 
 # temp
 import nest_asyncio
@@ -94,7 +95,12 @@ class ThoughtsService:
             logger.error(f"Failed to add Source vertex: {e}")
             raise Exception(e)
 
-    def add_thought(self, text: str, source_ids: List[int], embedding: Optional[List[float]] = None) -> Thoughts:
+    def add_thought(self, 
+                    text: str, 
+                    task: ThoughtType, 
+                    source_ids: List[int], 
+                    embedding: Optional[List[float]] = None
+                    ) -> Thoughts:
         """Adds a Thought to the DB, creates AGE vertex, and links to sources."""
         if not source_ids:
             raise ValueError("At least one source_id must be provided.")
@@ -129,7 +135,7 @@ class ThoughtsService:
 
             # Create thought vertex in AGE
             cypher_query_thought = f"""
-            CREATE (t:Thought {{
+            MERGE (t:Thought {{
                 pg_table_id: {thought_id}
             }})
             RETURN t
@@ -142,12 +148,13 @@ class ThoughtsService:
                 raise
 
         # Link thought to each source vertex in AGE
+        # Set `task` as `type` of the connection
         for source_id in source_ids:
             logger.info(f"Linking thought {thought_id} to source {source_id}")
             cypher_query_edge = f"""
             MATCH (t:Thought {{pg_table_id: {thought_id}}})
             MATCH (s:Source {{pg_table_id: {source_id}}})
-            MERGE (s)-[r:DERIVED_TO]->(t)
+            MERGE (s)-[r:DERIVED_TO {{type: '{task.name}'}}]->(t)
             RETURN r
             """
             try:
@@ -160,8 +167,9 @@ class ThoughtsService:
         return db_thought
 
     def add_collection(self, 
-                       contents: List[str], 
-                       source_keys: dict, 
+                       contents: List[str],
+                       task: ThoughtType,
+                       source_keys: dict,
                        source_properties: dict = {},
                        source_contents: List[str] = []
                     ) -> tuple[List[int], List[int]]:
@@ -188,7 +196,8 @@ class ThoughtsService:
             for index, content in enumerate(contents):
                 embed = embeddings[index]
                 thought = self.add_thought(
-                    text=content, 
+                    text=content,
+                    task=task,
                     source_ids=source_ids, 
                     embedding=embed
                 )

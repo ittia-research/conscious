@@ -13,6 +13,7 @@ from generated import conscious_api_pb2_grpc
 from servicers.find_servicer import FindServiceServicer
 from servicers.config_servicer import ConfigServiceServicer
 from servicers.review_servicer import ReviewServiceServicer
+from servicers.add_servicer import DataServiceServicer
 from servicers.health_servicer import HealthServicer
 
 # Import interceptors
@@ -86,6 +87,7 @@ def serve():
     conscious_api_pb2_grpc.add_ConfigServiceServicer_to_server(ConfigServiceServicer(), _server)
     conscious_api_pb2_grpc.add_ReviewServiceServicer_to_server(ReviewServiceServicer(), _server)
     conscious_api_pb2_grpc.add_HealthServicer_to_server(HealthServicer(), _server)
+    conscious_api_pb2_grpc.add_DataServiceServicer_to_server(DataServiceServicer(), _server)
 
     listen_addr = f'[::]:{GRPC_PORT}'
 

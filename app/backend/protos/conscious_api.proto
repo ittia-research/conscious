@@ -7,6 +7,8 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto"; // For flexible config structures
 import "google/protobuf/empty.proto"; // For requests/responses with no parameters
 
+message Empty {}
+
 // --- Find Service ---
 
 message FindThoughtsRequest {
@@ -23,19 +25,16 @@ service FindService {
   rpc FindThoughts(FindThoughtsRequest) returns (FindThoughtsResponse);
 }
 
-// --- Config Service ---
-
-message GetConfigsRequest {
-  string config_type = 1;
-}
+// --- Get Configs ---
 
 message GetConfigsResponse {
   // Using Struct to represent arbitrary JSON-like config data
-  google.protobuf.Struct configs = 1;
+  google.protobuf.Struct sources = 1;
+  google.protobuf.Struct tasks = 2;
 }
 
 service ConfigService {
-  rpc GetConfigs(GetConfigsRequest) returns (GetConfigsResponse);
+  rpc GetConfigs(google.protobuf.Empty) returns (GetConfigsResponse);
 }
 
 // --- Review Service ---
@@ -106,4 +105,23 @@ message HealthCheckResponse {
 service Health {
   rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
   // Optional: rpc Watch(HealthCheckRequest) returns (stream HealthCheckResponse);
+}
+
+// --- Add Service ---
+
+message AddDataRequest {
+  string task = 1;
+  string source_type = 2;
+  map<string, string> source_identifiers = 3;  // For key-value pairs like {"isbn": "..."}
+  optional bytes file_content = 4;             // Use bytes for raw file data
+  repeated string text_list = 5;               // List of text inputs
+}
+
+message AddDataResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+service DataService {
+  rpc AddData(AddDataRequest) returns (AddDataResponse);
 }

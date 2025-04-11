@@ -1,9 +1,7 @@
-import enum
 from sqlalchemy import (Column, Integer, BigInteger, Boolean, DateTime, 
                         Float, Text, func, SmallInteger, PrimaryKeyConstraint)
 from sqlalchemy.dialects.postgresql import REAL, TIMESTAMP # Use specific PG types
 from pgvector.sqlalchemy import VECTOR
-from fsrs import State as FSRSState
 
 from .session import Base
 from core.config import settings
