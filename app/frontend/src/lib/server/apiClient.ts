@@ -5,11 +5,7 @@ import * as protoLoader from '@grpc/proto-loader';
 import { promisify } from 'util';
 import path from 'path';
 import { env } from '$env/dynamic/private';
-// BEST PRACTICE: Consider using a structured logger like 'pino' or 'winston' for production
-// import pino from 'pino';
-// const logger = pino({ level: env.LOG_LEVEL || 'info' });
-// Replace console.log/info/error with logger.info/error etc.
-const logger = console; // Using console for simplicity here
+import { logger } from "$lib/server/logger"
 
 // --- Generated Types ---
 // Ensure these paths correctly point to your ts-proto output directory
