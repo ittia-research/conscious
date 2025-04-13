@@ -45,13 +45,17 @@ message ReviewCard {
     // Add other relevant fields you might want to display
 }
 
-// Response for GetNextReviewCard. Includes the card if available.
-message GetNextReviewCardResponse {
-    // Indicates if a card was found and returned.
-    // If false, the 'card' field should be ignored.
-    bool card_available = 1;
-    // The actual review card, only meaningful if card_available is true.
-    ReviewCard card = 2;
+// Request for GetNextReviewCards. Includes how many cards to fetch.
+message GetNextReviewCardsRequest {
+    // Number of cards requested. Server may return fewer if not enough are available.
+    // Defaults to a reasonable number (e.g., 3) if not specified or zero.
+    int32 count = 1;
+}
+
+// Response for GetNextReviewCards. Includes the list of cards found.
+message GetNextReviewCardsResponse {
+    // A list of review cards. Will be empty if no cards are available.
+    repeated ReviewCard cards = 1;
 }
 
 message SubmitReviewGradeRequest {
@@ -75,8 +79,8 @@ message DiscardThoughtResponse {
 }
 
 service ReviewService {
-  // Fetches the next thought due for review. Uses Empty request.
-  rpc GetNextReviewCard(google.protobuf.Empty) returns (GetNextReviewCardResponse);
+  // Fetches the next batch of thoughts due for review.
+  rpc GetNextReviewCards(GetNextReviewCardsRequest) returns (GetNextReviewCardsResponse);
 
   // Submits a review grade for a specific thought.
   rpc SubmitReviewGrade(SubmitReviewGradeRequest) returns (ReviewUpdateResponse);

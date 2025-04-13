@@ -1,7 +1,7 @@
 import logging
 import grpc
 from datetime import datetime, timezone
-from sqlalchemy import select
+from sqlalchemy import select, case, or_
 from google.protobuf.timestamp_pb2 import Timestamp
 from google.protobuf.empty_pb2 import Empty
 from fsrs import State
@@ -18,6 +18,12 @@ from modules.fsrs_services import review_card # Assuming this exists and works
 
 logger = logging.getLogger(__name__)
 
+
+# Default number of cards to fetch if not specified or invalid
+DEFAULT_FETCH_COUNT = 3
+MAX_FETCH_COUNT = 10 # A reasonable upper limit
+
+
 # Helper to convert Python datetime to Protobuf Timestamp
 def datetime_to_timestamp(dt: Optional[datetime]) -> Optional[Timestamp]:
     if dt:
@@ -26,65 +32,87 @@ def datetime_to_timestamp(dt: Optional[datetime]) -> Optional[Timestamp]:
         return ts
     return None
 
+
 class ReviewServiceServicer(conscious_api_pb2_grpc.ReviewServiceServicer):
     """Implements the ReviewService RPCs."""
 
-    def GetNextReviewCard(self, request: Empty,
-                          context: grpc.ServicerContext) -> conscious_api_pb2.GetNextReviewCardResponse:
+    def GetNextReviewCards(self, request: conscious_api_pb2.GetNextReviewCardsRequest,
+                           context: grpc.ServicerContext) -> conscious_api_pb2.GetNextReviewCardsResponse:
         """
-        Handles the GetNextReviewCard RPC.
-        Fetches the next thought due for review from the database.
+        Handles the GetNextReviewCards RPC.
+
+        Fetches multiple cards for review, prioritizing existing due cards.
+
+        Priority:
+            1. Existing cards due for review (srs_due <= now), ordered by oldest srs_due.
+            2. New cards (srs_due IS NULL), ordered by oldest thought_id.
         """
-        logger.info("Received GetNextReviewCard request")
+        logger.debug(f"Received GetNextReviewCards request: count={request.count}")
         now_utc = datetime.now(timezone.utc)
-        card_model = None
+
+        # Determine the number of cards to fetch
+        fetch_count = request.count
+        if fetch_count <= 0:
+            fetch_count = DEFAULT_FETCH_COUNT
+            logger.debug(f"Request count invalid or zero, using default: {fetch_count}")
+        elif fetch_count > MAX_FETCH_COUNT:
+            fetch_count = MAX_FETCH_COUNT
+            logger.warn(f"Request count exceeded max ({MAX_FETCH_COUNT}), limiting to max.")
 
         try:
             with get_db_session() as db:
-                # Query existing card
-                card_model = db.execute(
+                # Define the sorting logic:
+                # 1. Prioritize non-null srs_due (existing) over null srs_due (new)
+                #    - CASE WHEN srs_due IS NULL THEN 1 ELSE 0 END ASC
+                # 2. For existing cards (where CASE is 0), sort by srs_due ASC
+                # 3. For new cards (where CASE is 1), sort by thought_id ASC (srs_due is NULL anyway)
+                priority_order = case((Thoughts.srs_due.is_(None), 1), else_=0).asc()
+                due_order = Thoughts.srs_due.asc() # Handles existing cards
+                new_order = Thoughts.thought_id.asc() # Handles new cards and tie-breaks existing
+
+                stmt = (
                     select(Thoughts)
                     .filter(
-                        Thoughts.srs_discard.is_not(True),
-                        Thoughts.srs_due <= now_utc
+                        Thoughts.srs_discard.is_not(True),  # Must not be discarded
+                        or_(
+                            Thoughts.srs_due <= now_utc,    # Either due
+                            Thoughts.srs_due.is_(None)      # Or new
+                        )
                     )
-                    .order_by(Thoughts.srs_due.asc())
-                    .limit(1)
-                ).scalar_one_or_none()
-
-                if not card_model:
-                    # Query new cards
-                    card_model = db.execute(
-                        select(Thoughts)
-                        .filter(Thoughts.srs_due.is_(None), Thoughts.srs_discard.is_not(True))
-                        .order_by(Thoughts.thought_id.asc())
-                        .limit(1)
-                    ).scalar_one_or_none()
-
-                if card_model:
-                    # Important: Expunge before session closes if needed elsewhere,
-                    # but here we just copy data, so it might not be strictly necessary
-                    # depending on usage patterns after this function.
-                    # db.expunge(card_model) # Keep if needed
-
-                    logger.info(f"Found next review card: ID {card_model.thought_id}")
-                    review_card_proto = conscious_api_pb2.ReviewCard(
-                        thought_id=card_model.thought_id,
-                        text=card_model.text
-                        # Add other fields from `card_model` to `ReviewCard` proto if needed
+                    .order_by(
+                        priority_order,  # Existing cards first (0), then new cards (1)
+                        due_order,       # Sort existing cards by due date
+                        new_order        # Sort new cards by ID (and tie-break existing)
                     )
-                    return conscious_api_pb2.GetNextReviewCardResponse(
-                        card_available=True,
-                        card=review_card_proto
-                    )
+                    .limit(fetch_count)
+                )
+
+                # Use .scalars().all() to get a list of Thoughts objects
+                card_models = db.execute(stmt).scalars().all()
+
+                review_cards_proto = []
+                if card_models:
+                    logger.info(f"Found {len(card_models)} review card(s).")
+                    for card_model in card_models:
+                        # Optionally expunge if needed outside the session scope
+                        # db.expunge(card_model)
+                        review_card_proto = conscious_api_pb2.ReviewCard(
+                            thought_id=card_model.thought_id,
+                            text=card_model.text or "" # Ensure text is not None
+                        )
+                        review_cards_proto.append(review_card_proto)
                 else:
-                    logger.info("No review cards due.")
-                    return conscious_api_pb2.GetNextReviewCardResponse(card_available=False)
+                    logger.info("No review cards due or available.")
+
+                # Return the response with the list of cards (might be empty)
+                return conscious_api_pb2.GetNextReviewCardsResponse(
+                    cards=review_cards_proto
+                )
 
         except Exception as e:
-            logger.error(f"Error fetching next review card: {e}", exc_info=True)
-            context.abort(grpc.StatusCode.INTERNAL, "An internal error occurred while fetching the next review card.")
-            # return conscious_api_pb2.GetNextReviewCardResponse() # Unreachable
+            logger.error(f"Error fetching next review cards: {e}", exc_info=True)
+            context.abort(grpc.StatusCode.INTERNAL, "An internal error occurred while fetching review cards.")
+
 
     def SubmitReviewGrade(self, request: conscious_api_pb2.SubmitReviewGradeRequest,
                           context: grpc.ServicerContext) -> conscious_api_pb2.ReviewUpdateResponse:

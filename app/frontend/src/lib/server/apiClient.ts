@@ -20,7 +20,7 @@ import {
     FindThoughtsRequest,
     FindThoughtsResponse,
     GetConfigsResponse,
-    GetNextReviewCardResponse,
+    GetNextReviewCardsResponse,
     SubmitReviewGradeRequest,
     ReviewUpdateResponse,
     DiscardThoughtRequest,
@@ -35,7 +35,7 @@ import type {
     AllConfigsType,
     ApiError,
     IdentifierValues,
-    ReviewCardResponse as UIReviewCardResponse,
+    ReviewCardResponse,
     AddDataRequest,
     AddDataResponse
 } from '$lib/types';
@@ -45,6 +45,7 @@ const GRPC_SERVER_ADDRESS = env.BACKEND_API_BASE; // e.g., "localhost:50051" or 
 const API_KEY = env.BACKEND_API_KEY;
 const GRPC_CALL_TIMEOUT_MS = parseInt(env.GRPC_CALL_TIMEOUT_MS || '20000', 10);
 const CONFIG_CACHE_TTL_MS = parseInt(env.CONFIG_CACHE_TTL_MS || '300000', 10); // Default 5 minutes
+const DEFAULT_REVIEW_CARD_FETCH_COUNT = 3;
 
 if (!GRPC_SERVER_ADDRESS || !API_KEY) {
     logger.error('FATAL: GRPC_SERVER_ADDRESS or BACKEND_API_KEY environment variable is not configured.');
@@ -317,7 +318,7 @@ function getClients(): ServiceClients {
             review: {
                 // For Empty request type, use {} or object in TS, but the method signature expects it.
                 // The promisified version still needs the placeholder arg.
-                getNextReviewCard: promisifyClientMethod<{}, GetNextReviewCardResponse>(reviewGrpcClient.getNextReviewCard),
+                getNextReviewCards: promisifyClientMethod<{}, GetNextReviewCardsResponse>(reviewGrpcClient.getNextReviewCards),
                 submitReviewGrade: promisifyClientMethod<SubmitReviewGradeRequest, ReviewUpdateResponse>(reviewGrpcClient.submitReviewGrade),
                 discardThought: promisifyClientMethod<DiscardThoughtRequest, DiscardThoughtResponse>(reviewGrpcClient.discardThought),
             } as ReviewServiceClient,
@@ -460,41 +461,47 @@ export async function discardCard(thoughtId: number): Promise<DiscardThoughtResp
     } catch (error: any) {
         handleGrpcError(error, 'discardCard');
     }
-}
+};
 
-// -- Get next card --
-export async function getNextReviewCard(): Promise<UIReviewCardResponse | null> {
-    const client = getClients().review;
-    const metadata = createAuthMetadata();
-    const options = createCallOptions();
-    // Pass an empty object `{}` for google.protobuf.Empty requests
-    const request = {};
+// Get next batch of cards
+export async function getNextReviewCards(count: number = DEFAULT_REVIEW_CARD_FETCH_COUNT): Promise<ReviewCardResponse[]> {
+	const client = getClients().review; // Ensure this client is updated for the new RPC
+	const metadata = createAuthMetadata();
+	const options = createCallOptions();
+	// Create the request object matching the proto
+	const request = { count }; // Pass the desired count
 
-    try {
-        logger.info('Calling getNextReviewCard gRPC method');
-        const response = await client.getNextReviewCard(request, metadata, options);
+	try {
+		logger.info(`Calling getNextReviewCards gRPC method (requesting ${count})`);
+		// Ensure the client method name matches the updated proto RPC name
+		const response: GetNextReviewCardsResponse = await client.getNextReviewCards(request, metadata, options);
 
-        // REFINEMENT: Check card exists *before* accessing its properties
-        if (response.card_available && response.card) {
-             // Convert string ID back to number for UI/internal consistency, ensure it's a valid number
-             const numericThoughtId = Number(response.card.thought_id);
-             if (isNaN(numericThoughtId)) {
-                 logger.error({ cardId: response.card.thought_id }, "Received non-numeric thought_id string from getNextReviewCard");
-                 // Decide how to handle: return null, throw, use a default? Returning null seems safest.
-                 return null;
-             }
-             return {
-                 thought_id: numericThoughtId,
-                 text: response.card.text ?? '', // Handle potentially undefined text
-                 // Map other fields from response.card to UIReviewCardResponse if necessary
-             };
-        } else {
-            logger.info('No review card available from getNextReviewCard');
-            return null; // Explicitly return null when no card is available
-        }
-    } catch (error: any) {
-        handleGrpcError(error, 'getNextReviewCard');
-    }
+		if (response.cards && Array.isArray(response.cards)) {
+			logger.info(`Received ${response.cards.length} review card(s)`);
+			// Map the gRPC response format to your frontend ReviewCardResponse type
+			const mappedCards = response.cards.map((card) => {
+				const numericThoughtId = Number(card.thought_id); // Handle potential string ID
+				if (isNaN(numericThoughtId)) {
+					logger.error({ cardId: card.thought_id }, "Received non-numeric thought_id string from getNextReviewCards");
+					// Decide handling: throw, filter out, use default? Filtering seems safest.
+					return null;
+				}
+				return {
+					thought_id: numericThoughtId,
+					text: card.text ?? '' // Handle potentially undefined text
+				};
+			}).filter(card => card !== null) as ReviewCardResponse[]; // Filter out any nulls from mapping errors
+
+			return mappedCards;
+
+		} else {
+			logger.info('No review cards available or unexpected response format.');
+			return []; // Return an empty array if no cards are available or response is malformed
+		}
+	} catch (error: any) {
+		handleGrpcError(error, 'getNextReviewCards'); // Assuming this throws or logs appropriately
+		return []; // Return empty array on error to prevent breaking the calling code expecting an array
+	}
 }
 
 // -- Submit card review grade --
