@@ -6,7 +6,7 @@ services:
 
   # PostgreSQL Database Production
   prod-database:
-    # image: ghcr.io/ittia-research/conscious:latest-database
+    image: ghcr.io/ittia-research/conscious:latest-database
     build:
       context: ./app
       dockerfile: database/Dockerfile
@@ -25,7 +25,7 @@ services:
 
   # gRPC Backend Production
   prod-backend:
-    # image: ghcr.io/ittia-research/conscious:latest-backend
+    image: ghcr.io/ittia-research/conscious:latest-backend
     build:
       context: ./app
       dockerfile: backend/Dockerfile
@@ -50,7 +50,7 @@ services:
 
   # SvelteKit Frontend Production
   prod-frontend:
-    # image: ghcr.io/ittia-research/conscious:latest-frontend
+    image: ghcr.io/ittia-research/conscious:latest-frontend
     build:
       context: ./app
       dockerfile: frontend/Dockerfile
@@ -74,7 +74,7 @@ services:
 
   # Nginx Reverse Proxy Production
   prod-nginx:
-    # image: ghcr.io/ittia-research/conscious:latest-nginx
+    image: ghcr.io/ittia-research/conscious:latest-nginx
     build:
       context: ./app
       dockerfile: nginx/Dockerfile
