@@ -18,6 +18,9 @@
 	import { browser } from '$app/environment';
 	import { writable, derived, get } from 'svelte/store';
 
+    import CloseIcon from '$lib/components/icons/CloseIcon.svelte';
+    import InformationCircle from '$lib/components/icons/InformationCircle.svelte';
+
     import { projectName } from '$lib';
 
 	// --- Props ---
@@ -51,18 +54,16 @@
 	let unsubscribeAudioStatus = () => {};
 	let audioRef: HTMLAudioElement;
 
-	// --- Function to fetch initial cards ---
+	// --- Fetch initial cards ---
 	async function fetchInitialCards() {
 		if (!browser) return;
 
-		// console.log('[Mount] Attempting to fetch initial cards...');
 		isLoading.set(true);
 		isLoadError.set(false);
 		errorMessage.set(null);
 		cardCache.set([]);
 
 		try {
-			// Use CARD_CACHE_SIZE for the initial fetch as well
 			const initialCards = await fetchMoreCards(CARD_CACHE_SIZE);
 
 			if (initialCards.length > 0) {
@@ -114,10 +115,9 @@
 			}
 		});
 
-		// console.log('[Mount] Setting audio element.');
 		setAudioElement(audioRef);
 
-		await fetchInitialCards(); // Fetch the first batch of cards
+		await fetchInitialCards();
 	});
 
 	onDestroy(() => {
@@ -196,7 +196,7 @@
 			}
 		}
 
-        // Final check: if cache is empty and we are not in any loading/error state, mark as complete.
+        // Final check
         if (get(cardCache).length === 0 && !get(isRefilling) && !get(isLoading) && !get(isLoadError)) {
              // console.log('[Cache] Final check: Cache is empty and not loading/refilling/error. Setting complete.');
              isComplete.set(true);
@@ -267,7 +267,7 @@
 		const currentAudioState = audioStatus?.state ?? 'idle';
         const activeCardText = activeCard?.text?.trim(); // Use trimmed text
 
-		// --- Effect 1: Card Change ---
+		// --- Effect: Card Change ---
 		if (activeCardId !== previousCardId) {
 			// console.debug(`[Audio Effect] Card changed: ${previousCardId} -> ${activeCardId}`);
 			previousCardId = activeCardId;
@@ -281,7 +281,7 @@
 				stopAudio();
 			}
 		}
-        // --- Effect 2: Audio Toggle Change ---
+        // --- Effect: Audio Toggle Change ---
         else if (activeCardId !== null && audioIsEnabled !== previousAudioEnabledState) {
             // console.debug(`[Audio Effect] Audio toggle changed: ${previousAudioEnabledState} -> ${audioIsEnabled} while card ${activeCardId} is displayed.`);
 
@@ -312,17 +312,18 @@
 
 </script>
 
+
 <svelte:head>
 	<title>Flashcard Review | {projectName}</title>
 </svelte:head>
 
+
 <!-- Hidden audio element controlled by audioPlayer utility -->
 <audio bind:this={audioRef} style="display: none;"></audio>
 
-<!-- Kept reduced padding from previous step -->
 <div class="container mx-auto px-4 py-4 md:py-2 max-w-3xl relative min-h-screen flex flex-col">
 
-	<!-- Top Controls Area (Audio Toggle & Info Popups) - Unchanged -->
+	<!-- Top Controls Area (Audio Toggle & Info Popups) -->
     <div class="absolute top-2 right-8 z-20 flex flex-col items-end space-y-2">
 		<!-- Speak button -->
         <div class="flex items-center space-x-2 p-1 bg-white dark:bg-gray-800 rounded-full shadow">
@@ -345,25 +346,64 @@
                 }}
             >Speak</span>
            <label for="audioToggle" class="relative inline-flex items-center cursor-pointer" title="Toggle automatic audio playback ({$isAudioGloballyEnabled ? 'On' : 'Off'})">
-               <input type="checkbox" id="audioToggle" class="sr-only peer" bind:checked={$isAudioGloballyEnabled} aria-label="Enable audio playback for review cards"/>
+                <input 
+                    type="checkbox" 
+                    id="audioToggle" 
+                    class="sr-only peer" 
+                    bind:checked={$isAudioGloballyEnabled} 
+                    aria-label="Enable audio playback for review cards"
+                />
                <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-offset-1 peer-focus:ring-indigo-500 dark:peer-focus:ring-indigo-600 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-indigo-600"></div>
            </label>
        </div>
-		<!-- Other popups... -->
-        {#if $showPermissionInfo}<!-- ... -->{/if}
-        {#if browser && audioStatus?.state === 'unsupported'}<!-- ... -->{/if}
+
+        <!-- Autoplay Permission Info Popup -->
+        {#if $showPermissionInfo}
+             <div class="permission-info-popup bg-yellow-100 border border-yellow-300 dark:bg-yellow-900 dark:border-yellow-700 dark:text-yellow-100 text-yellow-800 px-3 py-2 rounded-md shadow-lg text-xs max-w-xs text-left flex items-start space-x-1.5" role="alert">
+                  <div class="flex-shrink-0 pt-0.5">
+                      <InformationCircle classValue="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                  </div>
+                  <span>
+                       Audio paused. To enable autoplay, please
+                       <a href="https://support.google.com/chrome/answer/114662?hl=en&co=GENIE.Platform%3DDesktop#zippy=%2Callow-or-block-sound-for-a-specific-site" target="_blank" rel="noopener noreferrer" class="underline font-semibold hover:text-yellow-900 dark:hover:text-yellow-300">
+                          allow sound/autoplay
+                       </a>
+                        for this site in your browser settings. Reloading the page might be needed after changing settings.
+                  </span>
+                  <!-- Dismiss Button -->
+                 <button
+                     on:click={() => {
+                        showPermissionInfo.set(false);
+                        console.log('Dismiss permission info clicked!');
+                    }}
+                     class="ml-auto flex-shrink-0 -mt-1 -mr-1 p-1 rounded-full text-yellow-700 dark:text-yellow-200 hover:bg-yellow-200 dark:hover:bg-yellow-800 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                     aria-label="Dismiss permission notice"
+                 >
+                    <CloseIcon classValue="w-3 h-3" />
+                 </button>
+             </div>
+        {/if}
 	</div>
 
-	<!-- General Error Messages - Unchanged -->
-    {#if $errorMessage && !$showPermissionInfo && !$isLoadError}<!-- ... -->{/if}
-
-	<!-- Audio Status Indicator (Errors) - Unchanged -->
-    {#if $isAudioGloballyEnabled && browser && audioStatus?.state === 'error' && !$showPermissionInfo}<!-- ... -->{/if}
+	<!-- General Error Messages -->
+	{#if errorMessage && !showPermissionInfo /* Don't show general error if permission info is shown */}
+        <div transition:fade class="bg-red-100 border border-red-400 text-red-700 dark:bg-red-900 dark:border-red-700 dark:text-red-200 px-4 py-3 rounded relative mb-4 shadow" role="alert">
+           <strong class="font-bold">Error:</strong>
+           <span class="block sm:inline ml-1"> {errorMessage}</span>
+           {#if !isLoadError}
+               <button
+                    class="absolute top-0 bottom-0 right-0 px-4 py-3 text-red-500 dark:text-red-300 hover:text-red-700 dark:hover:text-red-100"
+                    on:click={() => { errorMessage.set(null); }}
+                    aria-label="Close error message"
+                >
+                    <CloseIcon classValue="fill-current h-6 w-6" />
+               </button>
+           {/if}
+       </div>
+	{/if}
 
 	<!-- Main Content Display Area -->
-    <!-- 2. Changed justify-center to justify-start to align content (the card) to the top -->
 	<div class="card-display-area min-h-[350px] sm:min-h-[300px] flex-grow flex flex-col items-center justify-start pt-2 sm:pt-4">
-        <!-- Added pt-4 sm:pt-6 here to create some space *above* the card within this area -->
 		{#if $isLoading}
 			<!-- Loading Initial Session State -->
 			<div class="text-center text-base-content/60 py-10">
@@ -373,12 +413,12 @@
 		{:else if $isLoadError}
 			<!-- Fatal Load Error State -->
             <div class="alert alert-error shadow-lg max-w-xl" role="alert">
-                <!-- ... error content ... -->
+                <p class="text-center text-gray-600 dark:text-gray-400 py-10">Could not load flashcard session.</p>
             </div>
 		{:else if $isComplete}
-			<!-- Review Complete State -->
 			<div transition:fade={{ duration: 300 }} class="text-center py-10 flex flex-col items-center">
-                 <!-- ... complete content ... -->
+                <h2 class="text-xl font-semibold text-green-600 dark:text-green-400">All highlights reviewed!</h2>
+                <p class="text-gray-600 dark:text-gray-400 mt-2">You've completed this session.</p>
 			</div>
 		{:else if $currentCard}
 			<!-- Display Current Card and Action Buttons -->
@@ -411,8 +451,7 @@
                  >
                      <input type="hidden" name="thoughtId" value={$currentCard.thought_id} />
 
-                     <!-- *** Refined Card Structure *** -->
-                     <!-- 1. Adjusted main card background opacity slightly -->
+                     <!-- *** Card Structure *** -->
                      <div class="card w-full
                                 bg-white/80 dark:bg-gray-900/70   /* Slightly less transparent background */
                                 backdrop-blur-sm                  /* Optional: still keep or remove based on performance */
@@ -422,8 +461,6 @@
                      ">
                         <div class="card-body p-5 sm:p-6 flex flex-col">
                             <!-- Text Area -->
-                            <!-- 1. Made text area background MUCH less transparent for readability -->
-                            <!-- 1. Adjusted text color slightly for better contrast assurance -->
                             <div class="mb-6 px-4 pb-1 rounded-md bg-white/95 dark:bg-gray-800/90" >
                                 <p class="text-lg whitespace-pre-wrap text-gray-900 dark:text-gray-100 text-justify">{$currentCard.text}</p>
                             </div>
@@ -476,10 +513,6 @@
              </div>
         {/if}
 	</div>
-
-	<!-- Global Loading Indicator (Toast style) - Unchanged -->
-    {#if ($submitting || ($isRefilling && !$isLoading)) && !$isComplete}<!-- ... -->{/if}
-
 </div>
 
 <style>
