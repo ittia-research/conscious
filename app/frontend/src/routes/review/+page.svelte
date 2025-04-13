@@ -322,69 +322,6 @@
 <audio bind:this={audioRef} style="display: none;"></audio>
 
 <div class="container mx-auto px-4 py-4 md:py-2 max-w-3xl relative min-h-screen flex flex-col">
-
-	<!-- Top Controls Area (Audio Toggle & Info Popups) -->
-    <div class="absolute top-2 right-8 z-20 flex flex-col items-end space-y-2">
-		<!-- Speak button -->
-        <div class="flex items-center space-x-2 p-1 bg-white dark:bg-gray-800 rounded-full shadow">
-            <span 
-                class="text-sm font-medium text-gray-700 dark:text-gray-300 pl-2 cursor-pointer"
-                on:click={() => {
-                    // Play audio when the text area is clicked
-                    if ($currentCard?.text?.trim()) {
-                        loadAndPlayAudio($currentCard.text.trim());
-                    }
-                }}
-                role="button"
-                aria-label="Replay audio for this card"
-                tabindex="0"
-                on:keypress={(e) => { // TO-DO: Allow replay via keyboard (Enter/Space)
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault(); // Prevent default space scroll/enter actions
-                        if ($currentCard?.text?.trim()) { loadAndPlayAudio($currentCard.text.trim()); }
-                    }
-                }}
-            >Speak</span>
-           <label for="audioToggle" class="relative inline-flex items-center cursor-pointer" title="Toggle automatic audio playback ({$isAudioGloballyEnabled ? 'On' : 'Off'})">
-                <input 
-                    type="checkbox" 
-                    id="audioToggle" 
-                    class="sr-only peer" 
-                    bind:checked={$isAudioGloballyEnabled} 
-                    aria-label="Enable audio playback for review cards"
-                />
-               <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-offset-1 peer-focus:ring-indigo-500 dark:peer-focus:ring-indigo-600 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-indigo-600"></div>
-           </label>
-       </div>
-
-        <!-- Autoplay Permission Info Popup -->
-        {#if $showPermissionInfo}
-             <div class="permission-info-popup bg-yellow-100 border border-yellow-300 dark:bg-yellow-900 dark:border-yellow-700 dark:text-yellow-100 text-yellow-800 px-3 py-2 rounded-md shadow-lg text-xs max-w-xs text-left flex items-start space-x-1.5" role="alert">
-                  <div class="flex-shrink-0 pt-0.5">
-                      <InformationCircle classValue="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-                  </div>
-                  <span>
-                       Audio paused. To enable autoplay, please
-                       <a href="https://support.google.com/chrome/answer/114662?hl=en&co=GENIE.Platform%3DDesktop#zippy=%2Callow-or-block-sound-for-a-specific-site" target="_blank" rel="noopener noreferrer" class="underline font-semibold hover:text-yellow-900 dark:hover:text-yellow-300">
-                          allow sound/autoplay
-                       </a>
-                        for this site in your browser settings. Reloading the page might be needed after changing settings.
-                  </span>
-                  <!-- Dismiss Button -->
-                 <button
-                     on:click={() => {
-                        showPermissionInfo.set(false);
-                        console.log('Dismiss permission info clicked!');
-                    }}
-                     class="ml-auto flex-shrink-0 -mt-1 -mr-1 p-1 rounded-full text-yellow-700 dark:text-yellow-200 hover:bg-yellow-200 dark:hover:bg-yellow-800 focus:outline-none focus:ring-1 focus:ring-yellow-500"
-                     aria-label="Dismiss permission notice"
-                 >
-                    <CloseIcon classValue="w-3 h-3" />
-                 </button>
-             </div>
-        {/if}
-	</div>
-
 	<!-- General Error Messages -->
 	{#if errorMessage && !showPermissionInfo /* Don't show general error if permission info is shown */}
         <div transition:fade class="bg-red-100 border border-red-400 text-red-700 dark:bg-red-900 dark:border-red-700 dark:text-red-200 px-4 py-3 rounded relative mb-4 shadow" role="alert">
@@ -447,9 +384,74 @@
                             await update({ reset: false });
                         };
                     }}
-                    class="w-full max-w-xl"
+                    class="w-full max-w-xl relative"
                  >
-                     <input type="hidden" name="thoughtId" value={$currentCard.thought_id} />
+                    <input type="hidden" name="thoughtId" value={$currentCard.thought_id} />
+
+                    <!-- Speak button -->
+                    <div class="absolute top-0 right-0 translate-y-[-50%] z-20 flex flex-col items-end space-y-2">
+                        <div class="flex items-center space-x-2 p-1 bg-white dark:bg-gray-800 rounded-full shadow">
+                            <span 
+                                class="text-sm font-medium text-gray-700 dark:text-gray-300 pl-2 cursor-pointer"
+                                on:click={() => {
+                                    // Play audio when the text area is clicked
+                                    if ($currentCard?.text?.trim()) {
+                                        loadAndPlayAudio($currentCard.text.trim());
+                                    }
+                                }}
+                                role="button"
+                                aria-label="Replay audio for this card"
+                                tabindex="0"
+                                on:keypress={(e) => { // TO-DO: Allow replay via keyboard (Enter/Space)
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault(); // Prevent default space scroll/enter actions
+                                        if ($currentCard?.text?.trim()) { loadAndPlayAudio($currentCard.text.trim()); }
+                                    }
+                                }}
+                            >Speak</span>
+                            <label for="audioToggle" class="relative inline-flex items-center cursor-pointer" title="Toggle automatic audio playback ({$isAudioGloballyEnabled ? 'On' : 'Off'})">
+                                    <input 
+                                        type="checkbox" 
+                                        id="audioToggle" 
+                                        class="sr-only peer" 
+                                        bind:checked={$isAudioGloballyEnabled} 
+                                        aria-label="Enable audio playback for review cards"
+                                    />
+                                <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-offset-1 peer-focus:ring-indigo-500 dark:peer-focus:ring-indigo-600 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-indigo-600"></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Separately Positioned Popup Area -->
+                    <div class="absolute top-0 right-0 mt-5 mr-1 z-10 flex flex-col items-end space-y-2 w-full max-w-xs sm:max-w-sm">
+                        <!-- Autoplay Permission Info Popup -->
+                        {#if $showPermissionInfo}
+                            <div class="permission-info-popup bg-yellow-100 border border-yellow-300 dark:bg-yellow-900 dark:border-yellow-700 dark:text-yellow-100 text-yellow-800 px-3 py-2 rounded-md shadow-lg text-xs max-w-xs text-left flex items-start space-x-1.5" role="alert">
+                                <div class="flex-shrink-0 pt-0.5">
+                                    <InformationCircle classValue="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                                </div>
+                                <span>
+                                    Audio paused. To enable autoplay, please
+                                    <a href="https://support.google.com/chrome/answer/114662?hl=en&co=GENIE.Platform%3DDesktop#zippy=%2Callow-or-block-sound-for-a-specific-site" target="_blank" rel="noopener noreferrer" class="underline font-semibold hover:text-yellow-900 dark:hover:text-yellow-300">
+                                        allow sound/autoplay
+                                    </a>
+                                        for this site in your browser settings. Reloading the page might be needed after changing settings.
+                                </span>
+                                <!-- Dismiss Button -->
+                                <button
+                                    on:click={() => {
+                                        showPermissionInfo.set(false);
+                                        console.log('Dismiss permission info clicked!');
+                                    }}
+                                    class="ml-auto flex-shrink-0 -mt-1 -mr-1 p-1 rounded-full text-yellow-700 dark:text-yellow-200 hover:bg-yellow-200 dark:hover:bg-yellow-800 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                                    aria-label="Dismiss permission notice"
+                                >
+                                    <CloseIcon classValue="w-3 h-3" />
+                                </button>
+                            </div>
+                        {/if}
+                    </div>
+
 
                      <!-- *** Card Structure *** -->
                      <div class="card w-full
@@ -476,7 +478,6 @@
                                         class="btn {gradeInfo.color} {gradeInfo.textColor} font-semibold transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed flex-grow py-3"
                                         disabled={$submitting}
                                     >
-                                        {#if $submitting} <span class="loading loading-spinner loading-xs mr-1"></span> {/if}
                                         {gradeInfo.label}
                                     </button>
                                 {/each}
@@ -516,9 +517,8 @@
 </div>
 
 <style>
-	/* Minimal styles - relying mostly on Tailwind utilities */
     .container { display: flex; flex-direction: column; }
-    /* Updated card-display-area style */
+    /* card-display-area style */
     .card-display-area {
         flex-grow: 1; /* Takes up available space */
         display: flex;
