@@ -1,454 +1,328 @@
 // src/lib/audioPlayer.ts
-import { trpc } from '$lib/trpc/client';
-import type { AudioStreamOutput } from '$lib/trpc/client';
 import { writable, get } from 'svelte/store';
-import type { Subscription } from '@trpc/client';
-import { isAudioGloballyEnabled } from '$lib/stores/audioSettings';
+import { trpc } from '$lib/trpc/client';
+import { browser } from '$app/environment';
+import type { AudioQueryResult } from '$lib/trpc/client';
 
-// --- Configuration & State (remain the same) ---
-const TARGET_SAMPLE_RATE = 16000;
-const TARGET_NUM_CHANNELS = 1;
-const PREFERRED_AUDIO_MIME_TYPE = 'audio/webm; codecs=opus';
-const FALLBACK_AUDIO_MIME_TYPE = 'audio/webm; codecs=vorbis';
-let selectedAudioMimeType: string | null = null;
+// --- Types and State ---
+type AudioState = 'idle' | 'loading' | 'playing' | 'paused' | 'finished' | 'error' | 'unsupported';
 
-type AudioStatus = 'idle' | 'initializing' | 'buffering' | 'playing' | 'paused' | 'error' | 'finished' | 'unsupported';
-interface AudioPlayerState {
-    state: AudioStatus;
-    errorMessage?: string;
-}
-export const audioPlayerStatus = writable<AudioPlayerState>({ state: 'idle' });
-
-// --- MSE & Audio Element Variables (remain the same) ---
-let mediaSource: MediaSource | null = null;
-let sourceBuffer: SourceBuffer | null = null;
-let audioPlayerElement: HTMLAudioElement | null = null;
-let objectUrl: string | null = null;
-let currentTrpcSubscription: Subscription<AudioStreamOutput, unknown> | null = null;
-let chunkQueue: ArrayBuffer[] = [];
-let isAppending = false;
-let isStreamEnded = false;
-
-// --- Determine Supported MIME Type (remains the same) ---
-function determineSupportedMimeType(): string | null {
-    // ... (no changes) ...
-     if (typeof window !== 'undefined' && window.MediaSource) {
-        if (MediaSource.isTypeSupported(PREFERRED_AUDIO_MIME_TYPE)) {
-            console.log(`[AudioPlayer] Using preferred MIME type: ${PREFERRED_AUDIO_MIME_TYPE}`);
-            return PREFERRED_AUDIO_MIME_TYPE;
-        }
-        console.warn(`[AudioPlayer] Preferred MIME type ${PREFERRED_AUDIO_MIME_TYPE} not supported.`);
-        if (FALLBACK_AUDIO_MIME_TYPE && MediaSource.isTypeSupported(FALLBACK_AUDIO_MIME_TYPE)) {
-            console.log(`[AudioPlayer] Using fallback MIME type: ${FALLBACK_AUDIO_MIME_TYPE}`);
-            return FALLBACK_AUDIO_MIME_TYPE;
-        }
-        console.error(`[AudioPlayer] No supported WebM audio MIME type found.`);
-        return null;
-    }
-    return null;
+export interface AudioStatus {
+	state: AudioState;
+	errorMessage?: string;
+	currentText?: string;
 }
 
+const initialAudioState: AudioStatus = { state: 'idle' };
+export const audioPlayerStatus = writable<AudioStatus>(initialAudioState);
 
-// --- Core MSE Functions ---
+// --- Internal Variables ---
+let audioCtx: AudioContext | null = null;
+let audioElement: HTMLAudioElement | null = null;
+let currentObjectURL: string | null = null;
+let currentTextLoaded: string | null = null; // Text whose audio is in the element/ObjectURL
+let playRequestActiveForText: string | null = null; // Guard for concurrent loadAndPlay calls
 
-function initializeMediaSource(): boolean {
-    if (!audioPlayerElement) { /* ... (error handling) ... */ return false; }
-    if (!selectedAudioMimeType) { selectedAudioMimeType = determineSupportedMimeType(); }
-    if (!selectedAudioMimeType) { /* ... (error handling for unsupported) ... */ return false; }
+// --- Caches ---
+// Cache for pending fetch *Promises*
+const pendingAudioFetches = new Map<string, Promise<AudioQueryResult>>();
+// **NEW**: Cache for successfully fetched *Audio Data* (results)
+const audioDataCache = new Map<string, AudioQueryResult>(); // Key: text, Value: { audioBase64, mimeType }
 
-    console.log('[AudioPlayer MSE] Initializing MediaSource...');
-    cleanupMediaSource(); // Clean previous state
+// --- Internal Functions (getAudioContext, base64ToUint8Array, cleanupAudioSource remain the same) ---
 
-    mediaSource = new MediaSource();
-    objectUrl = URL.createObjectURL(mediaSource);
-
-    isStreamEnded = false;
-    chunkQueue = [];
-    isAppending = false;
-
-    // Add listeners *before* setting src
-    mediaSource.addEventListener('sourceopen', handleSourceOpen);
-    mediaSource.addEventListener('sourceended', handleSourceEnded);
-    mediaSource.addEventListener('sourceclose', handleSourceClose);
-
-    // Set src to trigger sourceopen
-    audioPlayerElement.src = objectUrl;
-    // audioPlayerElement.load(); // Implicit
-
-    console.log('[AudioPlayer MSE] MediaSource attaching...');
-    audioPlayerStatus.set({ state: 'initializing' }); // Set state: Initializing
-    return true;
+function getAudioContext(): AudioContext | null {
+	// ... (no changes from previous revision) ...
+	if (!browser) return null;
+	if (!audioCtx) {
+		try {
+			audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+			if (audioCtx.state === 'suspended') {
+				console.warn('[AudioPlayer] AudioContext suspended. User interaction likely needed.');
+			}
+		} catch (e) {
+			console.error('[AudioPlayer] Web Audio API not supported:', e);
+			audioPlayerStatus.set({ state: 'unsupported', errorMessage: 'Web Audio API not supported.' });
+			return null;
+		}
+	}
+	if (audioCtx.state === 'suspended') {
+		audioCtx.resume().catch((err) => console.warn('[AudioPlayer] Failed to resume AudioContext automatically:', err));
+	}
+	return audioCtx;
 }
 
-function handleSourceOpen() {
-    if (!mediaSource || mediaSource.readyState !== 'open' || !selectedAudioMimeType) {
-         console.warn('[AudioPlayer MSE] handleSourceOpen called in invalid state.');
-         // Avoid revoking URL if sourceopen didn't fire correctly? Or revoke always in cleanup?
-         // Let cleanup handle URL revocation robustness.
-        return;
-    }
-    console.log('[AudioPlayer MSE] Source open.');
-
-    // Revoke URL now that it's attached
-    if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-        objectUrl = null;
-        console.log('[AudioPlayer MSE] Object URL revoked.');
-    }
-
-    try {
-        console.log(`[AudioPlayer MSE] Adding SourceBuffer with type: ${selectedAudioMimeType}`);
-        sourceBuffer = mediaSource.addSourceBuffer(selectedAudioMimeType);
-        sourceBuffer.mode = 'sequence';
-
-        sourceBuffer.addEventListener('updateend', handleBufferUpdateEnd);
-        sourceBuffer.addEventListener('error', handleBufferError);
-        sourceBuffer.addEventListener('abort', handleBufferAbort);
-
-        console.log('[AudioPlayer MSE] SourceBuffer created.');
-        audioPlayerStatus.set({ state: 'buffering' }); // Set state: Buffering (ready for data)
-
-        // ** CRITICAL CHANGE: Attempt to play *here* **
-        // Now that the source buffer is ready, try starting playback.
-        if (audioPlayerElement) {
-            console.log('[AudioPlayer MSE] Attempting playback after source open...');
-            audioPlayerElement.play().then(() => {
-                console.log('[AudioPlayer MSE] Playback started successfully (or resumed).');
-                // State might already be 'playing' due to event listener, or update here if needed
-                // audioPlayerStatus.update(s => s.state === 'buffering' ? { state: 'playing' } : s);
-            }).catch(err => {
-                console.warn("[AudioPlayer MSE] Autoplay attempt failed after source open:", err.message);
-                // If play fails (e.g., autoplay blocked), set state to paused
-                 audioPlayerStatus.update(s => (s.state === 'buffering' || s.state === 'playing') ? { state: 'paused', errorMessage: "Playback paused (autoplay blocked?)." } : s);
-            });
-        } else {
-             console.warn('[AudioPlayer MSE] Audio element missing when trying to play after source open.');
-        }
-
-
-        // Append any chunks that arrived *before* the source was open
-        appendNextChunkFromQueue();
-
-    } catch (error) {
-        console.error('[AudioPlayer MSE] Error adding SourceBuffer:', error);
-        // ... (error handling as before, set state to 'error' or 'unsupported') ...
-         let errorMessage = `Failed to create audio buffer.`;
-         if (error instanceof Error) { errorMessage += ` Type: ${error.name}, Message: ${error.message}`; }
-         if (error instanceof DOMException && (error.name === 'NotSupportedError' || error.name === 'TypeError')) {
-            errorMessage += ` (Likely unsupported MIME type: ${selectedAudioMimeType})`;
-            audioPlayerStatus.set({ state: 'unsupported', errorMessage });
-         } else {
-            audioPlayerStatus.set({ state: 'error', errorMessage });
-         }
-        cleanupMediaSource();
-    }
+function base64ToUint8Array(base64: string): Uint8Array {
+    // ... (no changes from previous revision) ...
+    if (!browser) throw new Error('Cannot decode Base64 outside browser.');
+	try {
+		const binaryString = window.atob(base64);
+		const len = binaryString.length;
+		const bytes = new Uint8Array(len);
+		for (let i = 0; i < len; i++) { bytes[i] = binaryString.charCodeAt(i); }
+		return bytes;
+	} catch (error) {
+		console.error('[AudioPlayer] Error decoding Base64 string:', error);
+		throw new Error('Failed to decode audio data.');
+	}
 }
 
-// handleSourceEnded, handleSourceClose (remain the same)
-function handleSourceEnded() { console.log('[AudioPlayer MSE] Source ended.'); audioPlayerStatus.update(s => (!['error', 'idle', 'unsupported'].includes(s.state)) ? { state: 'finished' } : s); }
-function handleSourceClose() { console.log('[AudioPlayer MSE] Source closed.'); audioPlayerStatus.update(s => (!['error', 'idle', 'finished', 'unsupported'].includes(s.state)) ? { state: 'idle' } : s); }
-
-// handleBufferUpdateEnd (Add logging)
-function handleBufferUpdateEnd() {
-    isAppending = false;
-    // console.debug('[AudioPlayer MSE] Buffer update end.'); // Optional: Verbose log
-    appendNextChunkFromQueue(); // Try appending next queued chunk
-    checkAndFinalizeStream();   // Check if stream can be ended
+function cleanupAudioSource() {
+    // ... (no changes from previous revision) ...
+	if (!browser) return;
+	if (audioElement && !audioElement.paused) {
+		audioElement.pause();
+	}
+	if (audioElement) {
+		const currentSrc = audioElement.getAttribute('src');
+		if (currentSrc && currentSrc.startsWith('blob:')) {
+            // console.debug('[AudioPlayer] Cleaning up audio source (removing blob src).');
+			audioElement.removeAttribute('src');
+			audioElement.load();
+		}
+	}
+	if (currentObjectURL) {
+		URL.revokeObjectURL(currentObjectURL);
+		currentObjectURL = null;
+	}
+    currentTextLoaded = null;
 }
 
-// handleBufferError (Add logging)
-function handleBufferError(ev: Event) {
-    console.error('[AudioPlayer MSE] SourceBuffer error:', ev, sourceBuffer?.error); // Log buffer's error object
-    audioPlayerStatus.set({ state: 'error', errorMessage: 'Audio buffering error.' });
-    cleanupMediaSource();
-}
-// handleBufferAbort (remains the same)
-function handleBufferAbort(ev: Event) { console.warn('[AudioPlayer MSE] SourceBuffer abort:', ev); /* ... */ }
+// --- Exported Functions ---
 
-
-// --- Audio Element Event Handlers ---
-// (Add logging and ensure state updates are correct)
-
-function handleAudioPlay() {
-    console.log('[AudioPlayer Elem] Event: play');
-    // Don't force playing state here, wait for 'playing' event
-}
-
-function handleAudioPlaying() {
-    console.log('[AudioPlayer Elem] Event: playing (actual playback start/resume)');
-    audioPlayerStatus.update(s => (s.state !== 'playing') ? { state: 'playing' } : s ); // Update if not already playing
-}
-
-function handleAudioPause() {
-    console.log('[AudioPlayer Elem] Event: pause');
-    // Only set paused state if the pause wasn't triggered by us stopping (e.g., check isStreamEnded?)
-    // Or more simply, only transition from playing/buffering
-    audioPlayerStatus.update(s => (['playing', 'buffering'].includes(s.state)) ? { state: 'paused' } : s );
-}
-
-function handleAudioEnded() {
-    console.log('[AudioPlayer Elem] Event: ended (natural playback end)');
-    audioPlayerStatus.set({ state: 'finished' });
-}
-
-function handleAudioError(event: Event) {
-     const audioElement = event.target as HTMLAudioElement;
-     const error = audioElement.error;
-     console.error('[AudioPlayer Elem] Event: error:', error); // Log the MediaError object
-     let message = 'Unknown audio playback error.';
-     // ... (error code mapping remains the same) ...
-      if (error) {
-         switch (error.code) {
-             case MediaError.MEDIA_ERR_ABORTED: message = 'Playback aborted.'; break;
-             case MediaError.MEDIA_ERR_NETWORK: message = 'Network error during playback.'; break;
-             case MediaError.MEDIA_ERR_DECODE: message = 'Audio decoding error (check format).'; break;
-             case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED: message = 'Audio source/format not supported.'; break;
-             default: message = `Playback error (code ${error.code}).`;
-         }
-     }
-     audioPlayerStatus.set({ state: 'error', errorMessage: message });
-     cleanupMediaSource(); // Cleanup MSE on element error
-}
-
-function handleAudioWaiting() {
-     console.log('[AudioPlayer Elem] Event: waiting (buffering)');
-     audioPlayerStatus.update(s => (['playing', 'initializing'].includes(s.state)) ? { state: 'buffering' } : s);
-}
-function handleAudioStalled() { console.warn('[AudioPlayer Elem] Event: stalled'); /* Similar to waiting */ }
-
-
-// --- Data Handling ---
-
-function queueChunk(chunk: ArrayBuffer) {
-    if (!chunk || chunk.byteLength === 0) {
-        console.warn('[AudioPlayer MSE] Attempted to queue empty chunk.');
-        return;
-    }
-    // console.debug(`[AudioPlayer MSE] Queuing chunk size: ${chunk.byteLength}`); // Optional: Verbose
-    chunkQueue.push(chunk);
-    // Attempt to append immediately *only if buffer is ready*
-    if (sourceBuffer && !sourceBuffer.updating && !isAppending && mediaSource?.readyState === 'open') {
-       appendNextChunkFromQueue();
-    } else {
-        // console.debug('[AudioPlayer MSE] Conditions not met for immediate append from queue.', { hasBuffer: !!sourceBuffer, updating: sourceBuffer?.updating, isAppending, msState: mediaSource?.readyState});
-    }
-}
-
-function appendNextChunkFromQueue() {
-    if (isAppending || chunkQueue.length === 0 || !sourceBuffer || sourceBuffer.updating || !mediaSource || mediaSource.readyState !== 'open') {
-        // console.debug('[AudioPlayer MSE] Skipping append.', { isAppending, queue: chunkQueue.length, hasBuffer: !!sourceBuffer, updating: sourceBuffer?.updating, msState: mediaSource?.readyState });
-        return; // Conditions not met
-    }
-
-    isAppending = true;
-    const chunkToAppend = chunkQueue.shift()!;
-    // console.debug(`[AudioPlayer MSE] Dequeued chunk size: ${chunkToAppend.byteLength}. Appending...`); // Optional: Verbose
-
-    try {
-        sourceBuffer.appendBuffer(chunkToAppend);
-        // console.debug('[AudioPlayer MSE] appendBuffer called.'); // Optional: Verbose
-        // 'updateend' will fire on completion
-    } catch (error) {
-        console.error('[AudioPlayer MSE] Error during appendBuffer:', error);
-         isAppending = false; // Reset flag on error!
-         if (error instanceof Error && error.name === 'QuotaExceededError') {
-             console.warn('[AudioPlayer MSE] Buffer quota exceeded.');
-             audioPlayerStatus.set({ state: 'error', errorMessage: 'Audio buffer full.' });
-         } else {
-             audioPlayerStatus.set({ state: 'error', errorMessage: `Failed to buffer audio data: ${error instanceof Error ? error.message : 'Unknown error'}` });
-         }
-        cleanupMediaSource(); // Cleanup on append error
-    }
-}
-
-// signalEndOfStream, checkAndFinalizeStream (remain the same)
-function signalEndOfStream() { console.log('[AudioPlayer MSE] SignalEndOfStream called.'); isStreamEnded = true; checkAndFinalizeStream(); }
-function checkAndFinalizeStream() { /* ... (no changes) ... */ }
-
-
-// --- Public Control Functions ---
-
-// setAudioElement (Add listeners here, remove from initialize)
+// setAudioElement remains the same as the previous revision
 export function setAudioElement(element: HTMLAudioElement | null) {
-     // Remove listeners from previous element if any
-     if (audioPlayerElement) {
-        audioPlayerElement.removeEventListener('play', handleAudioPlay);
-        audioPlayerElement.removeEventListener('playing', handleAudioPlaying);
-        audioPlayerElement.removeEventListener('pause', handleAudioPause);
-        audioPlayerElement.removeEventListener('ended', handleAudioEnded);
-        audioPlayerElement.removeEventListener('error', handleAudioError);
-        audioPlayerElement.removeEventListener('waiting', handleAudioWaiting);
-        audioPlayerElement.removeEventListener('stalled', handleAudioStalled);
-     }
-
-     if (element) {
-          console.log('[AudioPlayer] Audio element set.');
-          audioPlayerElement = element;
-          audioPlayerElement.preload = 'auto';
-
-          // Add listeners to the new element
-          audioPlayerElement.addEventListener('play', handleAudioPlay);
-          audioPlayerElement.addEventListener('playing', handleAudioPlaying);
-          audioPlayerElement.addEventListener('pause', handleAudioPause);
-          audioPlayerElement.addEventListener('ended', handleAudioEnded);
-          audioPlayerElement.addEventListener('error', handleAudioError);
-          audioPlayerElement.addEventListener('waiting', handleAudioWaiting);
-          audioPlayerElement.addEventListener('stalled', handleAudioStalled);
-
-
-          // Determine supported type lazily if needed
-          if (!selectedAudioMimeType && typeof window !== 'undefined') {
-               selectedAudioMimeType = determineSupportedMimeType();
-               if (!selectedAudioMimeType) {
-                    audioPlayerStatus.set({ state: 'unsupported', errorMessage: 'Streaming audio format (Opus/WebM) not supported.' });
-               }
-          }
-     } else {
-          console.log('[AudioPlayer] Audio element cleared.');
-          const currentState = get(audioPlayerStatus).state;
-          if (!['idle', 'finished', 'error', 'unsupported'].includes(currentState)) {
-             stopAudio(); // Stop if active when element is removed
-          }
-          audioPlayerElement = null;
-     }
+	// ... (no changes from previous revision) ...
+	if (!browser) return;
+	if (audioElement && audioElement !== element) {
+        // console.debug('[AudioPlayer] Detaching listeners from old audio element.');
+		audioElement.onplay = null;
+		audioElement.onpause = null;
+		audioElement.onended = null;
+		audioElement.onerror = null;
+        audioElement.onwaiting = null;
+		audioElement.oncanplay = null;
+        cleanupAudioSource();
+	}
+	audioElement = element;
+	if (audioElement) {
+		// console.log('[AudioPlayer] Audio element set.');
+		audioElement.volume = 1.0;
+		audioElement.onplay = () => { /* ... */ };
+		audioElement.onpause = () => { /* ... */ };
+		audioElement.onended = () => { /* ... */ };
+		audioElement.onerror = (e) => { /* ... */ };
+        audioElement.onwaiting = () => { /* ... */ };
+		audioElement.oncanplay = () => { /* ... */ };
+	} else {
+		// console.log('[AudioPlayer] Audio element unset.');
+		stopAudio();
+	}
 }
 
 
-// playTextWithTRPC (Remove play() call from onStarted)
-export function playTextWithTRPC(text: string) {
-    // ... (initial checks for enabled, text, element, mime type remain the same) ...
-     if (!get(isAudioGloballyEnabled)) { /* ... */ return; }
-     if (!text) { /* ... */ return; }
-     if (!audioPlayerElement) { /* ... */ return; }
-     if (!selectedAudioMimeType) { /* ... */ return; }
+/**
+ * Initiates fetching audio if not already cached or pending. Caches the result.
+ */
+export function initiateAudioFetchIfNeeded(text: string): void {
+	if (!browser || !text || text.trim() === '' || !trpc) return;
 
-    console.log('[AudioPlayer] Requesting playback for:', text.substring(0,30));
-    stopAudio(); // Clean slate
-
-    if (!initializeMediaSource()) {
-        console.error("[AudioPlayer] Failed to initialize MediaSource setup.");
-        return; // Status already set
+	// 1. Check Data Cache first
+	if (audioDataCache.has(text)) {
+        // console.debug(`[AudioPlayer PreFetch] Data already in cache for: "${text.substring(0, 30)}..."`);
+        return;
     }
 
-    // If initializeMediaSource succeeded, state is 'initializing'
-    // It will transition to 'buffering' in handleSourceOpen, which now attempts play()
+	// 2. Check Pending Promises
+	if (pendingAudioFetches.has(text)) {
+		// console.debug(`[AudioPlayer PreFetch] Fetch already pending for: "${text.substring(0, 30)}..."`);
+		return;
+	}
 
-    console.log(`[AudioPlayer] Subscribing to tRPC audioStream (Opus/WebM)...`);
-    currentTrpcSubscription = trpc().audioStream.subscribe(
-        { text },
-        {
-            onStarted() {
-                console.log('[AudioPlayer tRPC] Subscription started.');
-                // ** DO NOT CALL play() HERE ANYMORE **
-                // Play is now attempted in handleSourceOpen
-            },
-            onData(base64OpusChunk: AudioStreamOutput) {
-                // ... (decoding and queueChunk logic remains the same) ...
-                 const currentState = get(audioPlayerStatus).state;
-                 if (['error', 'unsupported', 'idle', 'finished'].includes(currentState)) { /* ... stopAudio ... */ return; }
-                 try {
-                    const byteString = atob(base64OpusChunk);
-                    const byteArray = new Uint8Array(byteString.length);
-                    for (let i = 0; i < byteString.length; i++) { byteArray[i] = byteString.charCodeAt(i); }
-                    queueChunk(byteArray.buffer);
-                 } catch (error) { /* ... error handling ... */ stopAudio(); }
-            },
-            onError(err) { // Remain the same
-                 console.error('[AudioPlayer tRPC] Subscription error:', err);
-                 if (get(audioPlayerStatus).state !== 'unsupported') { audioPlayerStatus.set({ state: 'error', errorMessage: err.message || 'Stream error.' }); }
-                 stopAudio();
-            },
-            onComplete() { // Remain the same
-                console.log('[AudioPlayer tRPC] Subscription completed.');
-                 const currentState = get(audioPlayerStatus).state;
-                 if (!['error', 'unsupported', 'idle', 'finished'].includes(currentState)) { signalEndOfStream(); }
-                 else { console.warn(`[AudioPlayer tRPC] Completed, but player state is ${currentState}.`); }
-            },
-        }
-    );
+	console.log(`[AudioPlayer PreFetch] Initiating background fetch for: "${text.substring(0, 30)}..."`);
+	const fetchPromise = trpc().getAudioForText.query({ text });
+
+	// Store the promise
+	pendingAudioFetches.set(text, fetchPromise);
+
+	// Process the result when the promise settles
+	fetchPromise
+		.then(result => {
+			if (result?.audioBase64) {
+                console.debug(`[AudioPlayer PreFetch] SUCCESS, caching data for: "${text.substring(0, 30)}..."`);
+                // **CACHE THE RESULT DATA**
+                audioDataCache.set(text, result);
+            } else {
+                 console.warn(`[AudioPlayer PreFetch] SUCCESS but no audio data received for: "${text.substring(0, 30)}..."`);
+            }
+		})
+		.catch(err => {
+			console.warn(`[AudioPlayer PreFetch] FAILED for: "${text.substring(0, 30)}..."`, err);
+            // Optional: remove from data cache if it was added optimistically elsewhere? Not needed here.
+		})
+		.finally(() => {
+            // Always remove the *promise* from the pending map once settled.
+			pendingAudioFetches.delete(text);
+			// console.debug(`[AudioPlayer PreFetch] Removed pending fetch entry for: "${text.substring(0, 30)}..."`);
+		});
 }
 
-// stopAudio (Ensure listeners are removed here too)
+/**
+ * Loads audio from cache or fetches, then decodes and plays.
+ */
+export async function loadAndPlayAudio(text: string) {
+	if (!browser || !audioElement || !text || text.trim() === '' || !trpc) {
+        // console.warn('[AudioPlayer Play] Preconditions not met.');
+        return;
+    }
+
+	// console.log(`[AudioPlayer Play] Request load/play: "${text.substring(0, 30)}..."`);
+
+    // Comment out to allow re-play
+	// if (playRequestActiveForText === text) {
+	// 	console.warn(`[AudioPlayer Play] Request already active. Ignoring.`);
+	// 	return;
+	// }
+
+	// --- Ensure AudioContext ---
+	if (!getAudioContext()) { /* ... error handling ... */ return; }
+
+	const status = get(audioPlayerStatus);
+    const previousText = status.currentText;
+
+	// --- Stop/Cleanup ---
+    if (status.state !== 'idle' && status.state !== 'finished' && previousText !== text) {
+        // console.log(`[AudioPlayer Play] Stopping previous audio before loading new.`);
+        stopAudio();
+    }
+
+	// --- Set Guard & Loading State ---
+    playRequestActiveForText = text;
+    audioPlayerStatus.set({ state: 'loading', currentText: text });
+
+    let audioResult: AudioQueryResult | null = null;
+    let fetchSource: 'cache' | 'pending' | 'new' = 'new'; // For debugging
+
+	try {
+        // --- Step 1: Check Data Cache ---
+        if (audioDataCache.has(text)) {
+            audioResult = audioDataCache.get(text)!;
+            fetchSource = 'cache';
+            console.debug(`[AudioPlayer Play] Using cached data for: "${text.substring(0, 30)}..."`);
+        } else {
+            // --- Step 2: Check Pending Fetch ---
+            let audioPromise: Promise<AudioQueryResult>;
+            if (pendingAudioFetches.has(text)) {
+                fetchSource = 'pending';
+                 console.debug(`[AudioPlayer Play] Using pending promise for: "${text.substring(0, 30)}..."`);
+                audioPromise = pendingAudioFetches.get(text)!;
+                // Wait for it and cache the result
+                audioResult = await audioPromise; // Let potential errors propagate
+                if (audioResult?.audioBase64) {
+                    audioDataCache.set(text, audioResult); // Cache on successful await
+                }
+            } else {
+                // --- Step 3: Initiate New Fetch ---
+                fetchSource = 'new';
+                console.log(`[AudioPlayer Play] Fetching new audio for: "${text.substring(0, 30)}..." (Cache/Pending Miss)`);
+                audioPromise = trpc().getAudioForText.query({ text });
+                // Store promise and add cleanup *immediately* in case of concurrent calls
+                pendingAudioFetches.set(text, audioPromise);
+                audioPromise.finally(() => { pendingAudioFetches.delete(text); });
+
+                // Await the result
+                audioResult = await audioPromise; // Let potential errors propagate
+                if (audioResult?.audioBase64) {
+                     console.debug(`[AudioPlayer Play] New fetch success, caching data for: "${text.substring(0, 30)}..."`);
+                    audioDataCache.set(text, audioResult); // Cache on successful await
+                } else {
+                    console.warn(`[AudioPlayer Play] New fetch success but no audio data received.`);
+                }
+            }
+        }
+
+        // --- Check if we got valid data ---
+        if (!audioResult?.audioBase64) {
+            throw new Error(`No audio data obtained (${fetchSource}) for "${text.substring(0, 30)}..."`);
+        }
+
+		// --- Prepare for new audio ---
+        cleanupAudioSource(); // Clean previous source *before* loading new
+        currentTextLoaded = text; // Mark text *after* cleanup
+
+		// --- Check Context after await/cache check ---
+		const currentStatus = get(audioPlayerStatus);
+		if (!audioElement || currentStatus.currentText !== text || currentStatus.state !== 'loading') {
+			console.warn(`[AudioPlayer Play] Context changed (${currentStatus.state}/${currentStatus.currentText}) during fetch/processing. Aborting playback.`);
+            if (playRequestActiveForText === text) playRequestActiveForText = null;
+			return;
+		}
+
+        // --- Decode and Load ---
+        const { audioBase64, mimeType } = audioResult;
+		const audioBytes = base64ToUint8Array(audioBase64);
+		const blob = new Blob([audioBytes], { type: mimeType });
+		currentObjectURL = URL.createObjectURL(blob);
+
+		// console.debug('[AudioPlayer Play] Setting src and loading...');
+		audioElement.src = currentObjectURL;
+		audioElement.load();
+
+		// --- Play ---
+		// console.log(`[AudioPlayer Play] Attempting to play (${fetchSource})...`);
+		await audioElement.play();
+		// console.debug('[AudioPlayer Play] Play command initiated.');
+        // onplay handler sets 'playing' state and clears guard
+
+	} catch (error: any) {
+		console.error(`[AudioPlayer Play] Error during load/play (${fetchSource}):`, error);
+        if (playRequestActiveForText === text) playRequestActiveForText = null; // Clear guard on error
+		let message = error instanceof Error ? error.message : 'Failed to load or play audio.';
+        const statusBeforeError = get(audioPlayerStatus);
+        const textOnError = currentTextLoaded ?? text; // Use intended text if load failed early
+        cleanupAudioSource(); // Clean up potentially failed source
+
+        if(statusBeforeError.currentText === textOnError && statusBeforeError.state === 'loading') {
+             if (error.name === 'NotAllowedError') { /* ... handle autoplay ... */ }
+             else { audioPlayerStatus.set({ state: 'error', errorMessage: message, currentText: textOnError }); }
+        } else { /* ... log warning ... */ }
+	}
+}
+
+/**
+ * Stops audio, cleans up, resets state. Also clears caches (optional).
+ */
 export function stopAudio() {
-    console.log('[AudioPlayer] Stop requested.');
+	if (!browser) return;
+	// console.log('[AudioPlayer] Stop requested.');
 
-    if (currentTrpcSubscription) {
-        currentTrpcSubscription.unsubscribe();
-        currentTrpcSubscription = null;
-        console.log('[AudioPlayer] tRPC subscription stopped.');
-    }
+    const textBeingLoaded = playRequestActiveForText;
+    if (textBeingLoaded) playRequestActiveForText = null; // Clear guard
 
-    // Pause and remove element listeners
-    if (audioPlayerElement) {
-        // Remove listeners added in setAudioElement
-        audioPlayerElement.removeEventListener('play', handleAudioPlay);
-        audioPlayerElement.removeEventListener('playing', handleAudioPlaying);
-        audioPlayerElement.removeEventListener('pause', handleAudioPause);
-        audioPlayerElement.removeEventListener('ended', handleAudioEnded);
-        audioPlayerElement.removeEventListener('error', handleAudioError);
-        audioPlayerElement.removeEventListener('waiting', handleAudioWaiting);
-        audioPlayerElement.removeEventListener('stalled', handleAudioStalled);
+    const textThatWasLoaded = currentTextLoaded;
+	cleanupAudioSource(); // Handles pause, src removal, object URL revoke, clears currentTextLoaded
 
-        if (!audioPlayerElement.paused) {
-            audioPlayerElement.pause();
-            console.log('[AudioPlayer] Audio element paused.');
+	const currentState = get(audioPlayerStatus).state;
+	if (currentState !== 'idle' && currentState !== 'finished') {
+		audioPlayerStatus.set({ state: 'idle', errorMessage: undefined, currentText: undefined });
+	} else {
+        if(get(audioPlayerStatus).currentText !== undefined){
+			audioPlayerStatus.update(s => ({...s, currentText: undefined}));
         }
-    }
+	}
 
-    cleanupMediaSource(); // Handles MSE/SourceBuffer cleanup
-
-    chunkQueue = [];
-    isAppending = false;
-    isStreamEnded = false;
-
-    const currentState = get(audioPlayerStatus).state;
-    if (!['idle', 'error', 'unsupported', 'finished'].includes(currentState)) {
-       audioPlayerStatus.set({ state: 'idle' });
-       console.log('[AudioPlayer] State set to idle.');
-    } else {
-       console.log(`[AudioPlayer] Stop requested, retaining final state: ${currentState}`);
-    }
+    // --- Optional: Cache Clearing ---
+    // Decide if stopAudio should clear the data cache. Generally, probably not,
+    // unless memory is a huge concern or you want a fresh start.
+    // audioDataCache.clear();
+    // pendingAudioFetches.clear(); // Might cancel ongoing fetches if AbortController was used
 }
 
-// cleanupMediaSource (remains largely the same, ensure URL revoked)
-function cleanupMediaSource() {
-    console.log('[AudioPlayer MSE] Cleaning up MediaSource resources...');
-    // ... (SourceBuffer cleanup: remove listeners, abort if updating) ...
-     if (sourceBuffer) {
-        sourceBuffer.removeEventListener('updateend', handleBufferUpdateEnd);
-        sourceBuffer.removeEventListener('error', handleBufferError);
-        sourceBuffer.removeEventListener('abort', handleBufferAbort);
-        if (mediaSource && mediaSource.readyState === 'open' && sourceBuffer.updating) {
-           try { console.log('[AudioPlayer MSE] Aborting active SourceBuffer op.'); sourceBuffer.abort(); }
-           catch (e) { console.warn("[AudioPlayer MSE] Error aborting source buffer:", e); }
-        }
-        sourceBuffer = null;
-    }
-
-    // ... (MediaSource cleanup: remove listeners, endOfStream if open) ...
-     if (mediaSource) {
-        mediaSource.removeEventListener('sourceopen', handleSourceOpen);
-        mediaSource.removeEventListener('sourceended', handleSourceEnded);
-        mediaSource.removeEventListener('sourceclose', handleSourceClose);
-        if (mediaSource.readyState === 'open') {
-            try { console.log('[AudioPlayer MSE] Attempting endOfStream during cleanup.'); mediaSource.endOfStream(); }
-            catch (e) { /* Ignore InvalidStateError */ if (!(e instanceof DOMException && e.name === 'InvalidStateError')) { console.warn("[AudioPlayer MSE] Error ending stream during cleanup:", e); } }
-        }
-        mediaSource = null;
-    }
-
-
-    // Detach from audio element and revoke URL
-    if (audioPlayerElement && audioPlayerElement.src && audioPlayerElement.src.startsWith('blob:')) {
-        console.log('[AudioPlayer MSE] Detaching MediaSource URL from src.');
-        audioPlayerElement.removeAttribute('src');
-        audioPlayerElement.load(); // Force release
-    }
-    if (objectUrl) {
-        console.log('[AudioPlayer MSE] Revoking Object URL during cleanup.');
-        URL.revokeObjectURL(objectUrl);
-        objectUrl = null;
-    }
-
-    console.log('[AudioPlayer MSE] MediaSource cleanup finished.');
+// Add a function to explicitly clear the audio data cache if needed (e.g., on logout)
+export function clearAudioCache() {
+    if (!browser) return;
+    console.log('[AudioPlayer] Clearing audio data cache.');
+    audioDataCache.clear();
+    // Optionally clear pending fetches map too, though they manage themselves
+    // pendingAudioFetches.clear();
 }

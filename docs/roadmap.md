@@ -12,7 +12,10 @@
 ## Features
 ### Interactive
 Output:
- - [ ] TTS
+ - [x] TTS
+  
+#### Flashcard
+ - [ ] Different algorithms for different type of `thoughts`: book highlights, vocabulary, etc.
 
 ### Tasks
 - [ ] Import and engage with book highlights.

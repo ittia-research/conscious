@@ -7,6 +7,8 @@
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 
+    import { projectName } from '$lib';
+
 	export let data: PageData;
 	export let form: ActionData;
 
@@ -271,6 +273,10 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Add | {projectName}</title>
+</svelte:head>
+
 <!-- HTML structure remains the same as the previous version -->
 <!-- ... (keep the template section from the previous response) ... -->
 
@@ -446,6 +452,7 @@
 							<button
 								type="button"
 								on:click={clearFileSelection}
+                                aria-label="Clear file selection"
 								class="p-1 text-gray-400 hover:text-red-600 disabled:opacity-50"
 								title="Clear selected file"
 								disabled={loading}
@@ -496,6 +503,7 @@
 							<button
 								type="button"
 								on:click={() => removeTextInput(index)}
+                                aria-label="Remove text box"
 								class="p-1 text-gray-400 hover:text-red-600 disabled:opacity-50 mt-1"
 								title="Remove text box"
 								disabled={loading}

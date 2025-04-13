@@ -3,6 +3,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { env } from '$env/dynamic/private';
 import path from 'path';
+import { logger } from "$lib/server/logger";
 
 // --- Configuration ---
 const GATEWAY_ADDRESS = env.SPEAK_GRPC_ADDRESS || 'localhost:30051';
@@ -27,8 +28,7 @@ interface AudioGatewayClient extends grpc.Client {
 // Enum values as strings (matching the .proto definition)
 const OutputFormat = {
   OUTPUT_FORMAT_UNSPECIFIED: "OUTPUT_FORMAT_UNSPECIFIED",
-  OUTPUT_FORMAT_WAV_PCM_FLOAT32: "OUTPUT_FORMAT_WAV_PCM_FLOAT32",
-  OUTPUT_FORMAT_OPUS_WEBM: "OUTPUT_FORMAT_OPUS_WEBM"
+  OUTPUT_FORMAT_MP3: "OUTPUT_FORMAT_MP3"
 } as const; // Use 'as const' for better type safety if needed elsewhere
 
 // --- Load Proto ---
@@ -59,17 +59,17 @@ try {
         /* options */
     ) as AudioGatewayClient;
 
-    console.log(`gRPC client configured for: ${GATEWAY_ADDRESS}`);
+    logger.info(`gRPC client configured for: ${GATEWAY_ADDRESS}`);
 
 } catch (error) {
-    console.error("Failed to initialize gRPC client:", error);
+    logger.error("Failed to initialize gRPC client:", error);
     grpcClient = null; // Ensure client is null on error
 }
 
 // --- Health Check (Remains the same) ---
 export function checkGrpcConnection(): Promise<boolean> {
     if (!grpcClient) {
-        console.error('gRPC connection check failed: Client not initialized.');
+        logger.error('gRPC connection check failed: Client not initialized.');
         return Promise.resolve(false);
     }
     return new Promise((resolve) => {
@@ -77,10 +77,10 @@ export function checkGrpcConnection(): Promise<boolean> {
         deadline.setSeconds(deadline.getSeconds() + 5);
         grpcClient!.waitForReady(deadline, (error) => {
             if (error) {
-                console.error('gRPC connection check failed:', error.message);
+                logger.error('gRPC connection check failed:', error.message);
                 resolve(false);
             } else {
-                console.log('gRPC connection check successful.');
+                logger.info('gRPC connection check successful.');
                 resolve(true);
             }
         });
@@ -90,21 +90,21 @@ export function checkGrpcConnection(): Promise<boolean> {
 // --- Export the function to interact with the service ---
 export function synthesizeSpeechGrpc(text: string): grpc.ClientReadableStream<AudioChunk> | null {
      if (!grpcClient) {
-        console.error('gRPC client not initialized');
+        logger.error('gRPC client not initialized');
         return null;
      }
      try {
         const request: SynthesizeRequest = {
             target_text: text,
             // Request Opus/WebM format using the string enum value
-            output_format: OutputFormat.OUTPUT_FORMAT_OPUS_WEBM
+            output_format: OutputFormat.OUTPUT_FORMAT_MP3
         };
-        console.log(`Requesting speech synthesis (Opus/WebM) for text (start): "${text.substring(0, 50)}..."`);
+        logger.info(`Requesting TTS for text: "${text.substring(0, 50)}..."`);
         return grpcClient.SynthesizeSpeech(request);
 
     } catch (error) {
         // Catch potential errors during request creation (though unlikely here)
-        console.error('Error creating gRPC SynthesizeSpeech request object:', error);
+        logger.error('Error creating gRPC SynthesizeSpeech request object:', error);
         return null;
     }
     // Note: Errors during the actual gRPC call (like connection issues)

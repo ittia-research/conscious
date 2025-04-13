@@ -22,19 +22,23 @@ export interface AllConfigsType {
   tasks: ConfigsType;
 }
 
+
+// --- Flashcard Review ---
+
 export interface ReviewDiscardApiResponse {
   message: string
   id: number
 }
 
-export interface ReviewCardResponse {
-  thought_id: number;
-  text: string;
-}
-
 export interface ReviewGradeSubmission {
   grade: number;
 }
+
+export interface ReviewCardResponse {
+	thought_id: number;
+	text: string;
+}
+
 
 // --- Add Data ---
 
