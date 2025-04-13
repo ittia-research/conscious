@@ -24,8 +24,8 @@
 	export let form: ActionData; // From server actions (POST requests)
 
 	// --- Constants ---
-	const CARD_CACHE_SIZE = 3; // How many cards to keep ready
-	const REFILL_THRESHOLD = 2; // Fetch more when cache drops to this size
+	const CARD_CACHE_SIZE = 5; // How many cards to keep ready
+	const REFILL_THRESHOLD = 3; // Fetch more when cache drops to this size
 	const grades = [
 		{ label: 'Again', value: 1, color: 'btn-error', textColor: 'text-error-content' },
 		{ label: 'Hard', value: 2, color: 'btn-warning', textColor: 'text-warning-content' },
@@ -166,7 +166,7 @@
 
 		const currentCacheSize = get(cardCache).length;
 		if (currentCacheSize <= REFILL_THRESHOLD) {
-			const needed = CARD_CACHE_SIZE - currentCacheSize + 1; // Add one because flashcard server might return duplicate of the current card
+			const needed = CARD_CACHE_SIZE // The comming newly fetched cards might contains all the cards in the current cache
 			if (needed > 0) {
 				// console.log(`[Cache] Refill needed. Current size: ${currentCacheSize}, Threshold: ${REFILL_THRESHOLD}. Fetching ${needed} card(s).`);
 				const fetchedCards = await fetchMoreCards(needed); // Already handles isRefilling state
