@@ -21,6 +21,8 @@
     import CloseIcon from '$lib/components/icons/CloseIcon.svelte';
     import InformationCircle from '$lib/components/icons/InformationCircle.svelte';
 
+    import { handleKeydown } from '$lib/components/keyboardShortcuts';
+
     import { projectName } from '$lib';
 
 	// --- Props ---
@@ -35,6 +37,17 @@
 		{ label: 'Good', value: 3, color: 'btn-success', textColor: 'text-success-content' },
 		{ label: 'Easy', value: 4, color: 'btn-info', textColor: 'text-info-content' }
 	];
+
+    // --- Keyboard Shortcut ---
+	const KEYBOARD_SHORTCUTS = {
+		'1': { type: 'grade', value: 1 },
+		'2': { type: 'grade', value: 2 },
+		'3': { type: 'grade', value: 3 },
+		'4': { type: 'grade', value: 4 },
+		'd': { type: 'discard' },
+		' ': { type: 'speak' },
+        's': { type: 'speak' },
+	};
 
 	// --- State Stores ---
 	const cardCache = writable<ReviewCardResponse[]>([]);
@@ -310,6 +323,9 @@
 		showPermissionInfo.set(false);
 	}
 
+	function keyboardEventHandler(event: KeyboardEvent) {
+		handleKeydown(event, KEYBOARD_SHORTCUTS);
+	}
 </script>
 
 
@@ -318,8 +334,13 @@
 </svelte:head>
 
 
+<!-- Global listener for keyboard shortcuts -->
+<svelte:window on:keydown={keyboardEventHandler} />
+
+
 <!-- Hidden audio element controlled by audioPlayer utility -->
 <audio bind:this={audioRef} style="display: none;"></audio>
+
 
 <div class="container mx-auto px-4 py-4 md:py-2 max-w-3xl relative min-h-screen flex flex-col">
 	<!-- General Error Messages -->
@@ -361,6 +382,7 @@
 			<!-- Display Current Card and Action Buttons -->
             {#key $currentCard.thought_id}
                  <form
+                    id="review-form"
                     method="POST"
                     use:enhance={() => {
                         submitting.set(true);
@@ -391,7 +413,7 @@
                     <!-- Speak button -->
                     <div class="absolute top-0 right-0 translate-y-[-50%] z-20 flex flex-col items-end space-y-2">
                         <div class="flex items-center space-x-2 p-1 bg-white dark:bg-gray-800 rounded-full shadow">
-                            <span 
+                            <button 
                                 class="text-sm font-medium text-gray-700 dark:text-gray-300 pl-2 cursor-pointer"
                                 on:click={() => {
                                     // Play audio when the text area is clicked
@@ -399,16 +421,10 @@
                                         loadAndPlayAudio($currentCard.text.trim());
                                     }
                                 }}
-                                role="button"
+                                data-action="speak"
+                                type='button'
                                 aria-label="Replay audio for this card"
-                                tabindex="0"
-                                on:keypress={(e) => { // TO-DO: Allow replay via keyboard (Enter/Space)
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault(); // Prevent default space scroll/enter actions
-                                        if ($currentCard?.text?.trim()) { loadAndPlayAudio($currentCard.text.trim()); }
-                                    }
-                                }}
-                            >Speak</span>
+                            >Speak</button>
                             <label for="audioToggle" class="relative inline-flex items-center cursor-pointer" title="Toggle automatic audio playback ({$isAudioGloballyEnabled ? 'On' : 'Off'})">
                                     <input 
                                         type="checkbox" 
@@ -476,6 +492,7 @@
                                         name="grade"
                                         value={gradeInfo.value}
                                         class="btn {gradeInfo.color} {gradeInfo.textColor} font-semibold transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed flex-grow py-3"
+                                        data-action="grade"
                                         disabled={$submitting}
                                     >
                                         {gradeInfo.label}
@@ -489,6 +506,7 @@
                                     type="submit"
                                     formaction="?/discardCard"
                                     class="btn btn-ghost btn-sm text-base-content/70 hover:bg-error/10 hover:text-error dark:hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    data-action="discard"
                                     disabled={$submitting}
                                     title="Remove this card from future reviews"
                                 >

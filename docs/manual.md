@@ -31,6 +31,12 @@ docker compose --profile dev up -d  # Start
 docker compose --profile dev logs -f  # Check logs
 ```
 
+## Shortcuts
+Flashcard review:
+- review rating: 1 ~ 4
+- speak: s, space
+- discard: d
+
 ## Resources
 ### Models
 #### Google AI

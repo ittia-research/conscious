@@ -23,6 +23,11 @@ Output:
 ## Enhancement
 - [ ] Database tuning
 
+### Performence
+Frontend:
+- [ ] Limit card data RAM usage, consider long-term storage.
+- [ ] Use binary for audio to client via tRPC instead of Base64 encoding to avoid resource waste.
+
 ## Details
 - [ ] Database input sanitization, and keys of properties should not contain `keys`.
 
